@@ -20,6 +20,9 @@ import auditRoutes from './modules/audit/audit.routes.js';
 export function createApp() {
   const app = express();
 
+  // Trust proxy for Coolify / Docker (so express-rate-limit gets correct IP via X-Forwarded-For)
+  app.set('trust proxy', 1);
+
   // Security headers
   app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
