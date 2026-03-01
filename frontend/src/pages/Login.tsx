@@ -27,6 +27,8 @@ export default function Login() {
   const { isAuthenticated, user, setAuth } = useAuthStore();
   const navigate = useNavigate();
 
+  const showQuickLogin = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEV_LOGIN === 'true';
+
   const [step, setStep] = useState<Step>('credentials');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,7 +39,7 @@ export default function Login() {
   const [error, setError] = useState('');
 
   if (isAuthenticated) {
-    if (user && !user.totpEnabled && !import.meta.env.DEV) return <Navigate to="/setup-2fa" replace />;
+    if (user && !user.totpEnabled && !showQuickLogin) return <Navigate to="/setup-2fa" replace />;
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -61,7 +63,7 @@ export default function Login() {
       if (res.requireTotpSetup && res.accessToken && res.user) {
         setAuth(res.user, res.accessToken, res.refreshToken!);
         connectSocket();
-        if (import.meta.env.DEV) {
+        if (showQuickLogin) {
           navigate('/dashboard');
           toast.success('Bienvenue !', `Bonjour ${res.user.firstName} (2FA skippé en dev)`);
         } else {
@@ -129,7 +131,7 @@ export default function Login() {
         </div>
 
         {/* Dev quick-login panel */}
-        {import.meta.env.DEV && (
+        {showQuickLogin && (
           <div className="mb-4 bg-white/5 border border-white/10 rounded-2xl p-4">
             <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
               <LightningIcon size={12} weight="fill" className="text-yellow-400" />
