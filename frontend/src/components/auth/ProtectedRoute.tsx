@@ -10,9 +10,12 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   // Force TOTP setup if not done (skipped in dev)
+  // TEMPORAIRE: Désactivé pour la preprod afin de ne pas bloquer les utilisateurs
+  /*
   if (!import.meta.env.DEV && user && !user.totpEnabled && location.pathname !== '/setup-2fa') {
     return <Navigate to="/setup-2fa" replace />;
   }
+  */
 
   return <>{children}</>;
 }

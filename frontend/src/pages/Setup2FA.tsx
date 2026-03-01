@@ -78,8 +78,19 @@ export default function Setup2FA() {
                 Pour sécuriser votre compte, vous devez configurer l'authentification à 2 facteurs
                 avec Google Authenticator ou Authy.
               </p>
-              <Button onClick={handleGenerate} loading={loading} className="w-full">
+              <Button onClick={handleGenerate} loading={loading} className="w-full mb-3">
                 Générer le QR Code
+              </Button>
+              <Button
+                onClick={() => {
+                  connectSocket();
+                  navigate('/dashboard');
+                }}
+                variant="secondary"
+                className="w-full text-muted hover:text-navy"
+                disabled={loading}
+              >
+                Passer pour le moment
               </Button>
             </div>
           )}
