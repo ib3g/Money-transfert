@@ -83,8 +83,8 @@ export function BottomTabBar() {
         aria-label="Navigation principale"
       >
         <div className="flex items-end h-16 px-2 w-full">
-          <TabItem to="/dashboard" icon={<HouseIcon />} label="Dashboard" />
-          <TabItem to="/transactions" icon={<ArrowsLeftRightIcon />} label="Transferts" />
+          <TabItem to="/dashboard" icon={<HouseIcon size={28} />} label="Dashboard" />
+          <TabItem to="/transactions" icon={<ArrowsLeftRightIcon size={28} />} label="Transferts" />
 
           {/* CTA central */}
           {canCreate && (
@@ -114,8 +114,8 @@ export function BottomTabBar() {
               {({ isActive }) => (
                 <>
                   {unreadCount > 0
-                    ? <BellRingingIcon size={22} weight={isActive ? 'fill' : 'duotone'} />
-                    : <BellIcon size={22} weight={isActive ? 'fill' : 'duotone'} />
+                    ? <BellRingingIcon size={28} weight={isActive ? 'fill' : 'duotone'} />
+                    : <BellIcon size={28} weight={isActive ? 'fill' : 'duotone'} />
                   }
                   <span className="text-[10px] font-medium">Notifs</span>
                 </>
@@ -139,7 +139,7 @@ export function BottomTabBar() {
               aria-label="Plus de menus"
               aria-expanded={moreOpen}
             >
-              <DotsThreeIcon size={22} weight={moreOpen || moreIsActive ? 'fill' : 'regular'} />
+              <DotsThreeIcon size={28} weight={moreOpen || moreIsActive ? 'fill' : 'regular'} />
               <span className="text-[10px] font-medium">Plus</span>
             </button>
           </div>

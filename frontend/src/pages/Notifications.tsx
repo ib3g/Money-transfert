@@ -135,7 +135,7 @@ function NotifItem({ notif, onMarkRead }: { notif: Notification; onMarkRead: (id
 export default function Notifications() {
   const [page, setPage] = useState(1);
   const qc = useQueryClient();
-  const { markAsRead, markAllAsRead } = useNotificationStore();
+  const { markAsRead, markAllAsRead, unreadCount: unreadStoreCount } = useNotificationStore();
 
   const { data, isLoading } = useQuery({
     queryKey: ['notifications', page],
@@ -164,7 +164,8 @@ export default function Notifications() {
 
   const notifications = data?.data ?? [];
   const pagination = data?.pagination;
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  // Local page unread vs format global unread
+  const hasUnreadOnPage = notifications.some(n => !n.isRead);
 
   return (
     <div className="animate-fade-in max-w-2xl mx-auto">
@@ -175,8 +176,8 @@ export default function Notifications() {
             {isLoading ? '…' : `${pagination?.total ?? 0} notification${(pagination?.total ?? 0) !== 1 ? 's' : ''}`}
           </p>
         </div>
-        {unreadCount > 0 && (
-          <Button variant="ghost" onClick={() => markAll.mutate()} loading={markAll.isPending} className="gap-2 text-sm">
+        {(unreadStoreCount > 0 || hasUnreadOnPage) && (
+          <Button variant="ghost" onClick={() => markAll.mutate()} loading={markAll.isPending} className="gap-2 text-sm text-brand hover:text-brand-dark">
             <CheckIcon size={15} />
             Tout marquer comme lu
           </Button>

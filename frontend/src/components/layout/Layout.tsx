@@ -2,7 +2,9 @@ import { useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
+import { useNotificationStore } from '@/stores/notificationStore';
 import { connectSocket, setQueryClientRef } from '@/socket/socketClient';
+import { notificationsApi } from '@/api/notifications.api';
 import { Sidebar } from './Sidebar';
 import { BottomTabBar } from './BottomTabBar';
 import { Header } from './Header';
@@ -12,6 +14,7 @@ import { useMe } from '@/hooks/useAuth';
 
 export function Layout() {
   const { isAuthenticated } = useAuthStore();
+  const setUnreadCount = useNotificationStore(s => s.setUnreadCount);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -22,7 +25,12 @@ export function Layout() {
     }
     setQueryClientRef(queryClient);
     connectSocket();
-  }, [isAuthenticated, navigate, queryClient]);
+
+    // Fetch initial unread notifications count
+    notificationsApi.unreadCount()
+      .then(res => setUnreadCount(res.count))
+      .catch(() => { /* ignore */ });
+  }, [isAuthenticated, navigate, queryClient, setUnreadCount]);
 
   // Sync user data
   const { data: updatedUser } = useMe();

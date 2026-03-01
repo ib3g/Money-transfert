@@ -171,10 +171,15 @@ function QuickCodeSearch({ canCreate, userId }: { canCreate: boolean; userId?: s
             </div>
           )}
           {tx && !isLoading && (
-            <div className="border border-slate-100 rounded-xl p-4 space-y-3 bg-surface">
+            <div
+              onClick={goConfirm}
+              role="button"
+              tabIndex={0}
+              className="border border-slate-100 rounded-xl p-4 space-y-3 bg-surface cursor-pointer hover:bg-slate-50 hover:border-brand/30 transition-all group active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-brand/30"
+            >
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="font-mono text-xs font-bold text-brand">{tx.code}</p>
+                  <p className="font-mono text-xs font-bold text-brand group-hover:underline">{tx.code}</p>
                   <p className="text-sm font-semibold text-navy mt-0.5">{tx.recipientName}</p>
                 </div>
                 <StatusBadge status={tx.status} />
@@ -195,16 +200,19 @@ function QuickCodeSearch({ canCreate, userId }: { canCreate: boolean; userId?: s
               })()}
               {tx.status === 'PENDING' && tx.senderAgentId !== userId && (
                 <button
-                  onClick={goConfirm}
-                  className="w-full flex items-center justify-center gap-2 bg-gradient-brand text-white text-sm font-semibold py-2.5 rounded-xl hover:opacity-90 transition-opacity shadow-brand"
+                  onClick={(e) => { e.stopPropagation(); goConfirm(); }}
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-brand text-white text-sm font-semibold py-2.5 rounded-xl hover:opacity-90 transition-opacity shadow-brand mt-1"
                 >
                   <CheckCircleIcon size={16} weight="fill" />
                   Confirmer ce transfert
                 </button>
               )}
               {tx.status === 'PENDING' && tx.senderAgentId === userId && (
-                <div className="flex items-center gap-2 p-3 bg-warning/5 border border-warning/20 rounded-xl text-[11px] text-warning-dark">
-                  <WarningCircleIcon size={14} weight="fill" />
+                <div
+                  className="flex items-center gap-2 p-3 bg-warning/5 border border-warning/20 rounded-xl text-[11px] text-warning-dark mt-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <WarningCircleIcon size={14} weight="fill" className="flex-shrink-0" />
                   Vous ne pouvez pas confirmer un transfert que vous avez émis.
                 </div>
               )}
