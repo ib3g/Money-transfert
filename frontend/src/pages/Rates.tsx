@@ -185,12 +185,16 @@ function RateRow({
   return (
     <tr className="hover:bg-surface/50 transition-colors">
       <td className="px-6 py-4">
-        <div className="flex items-center gap-2 text-sm">
-          <span className="font-semibold text-navy">{srcZone?.name ?? '—'}</span>
-          <span className="px-1.5 py-0.5 bg-cyan/10 text-brand text-xs font-mono rounded">{srcZone?.currency}</span>
-          <ArrowRightIcon size={14} className="text-muted" />
-          <span className="font-semibold text-navy">{dstZone?.name ?? '—'}</span>
-          <span className="px-1.5 py-0.5 bg-cyan/10 text-brand text-xs font-mono rounded">{dstZone?.currency}</span>
+        <div className="flex flex-col text-sm leading-tight">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-navy">{srcZone?.name ?? '—'}</span>
+            <span className="text-[10px] px-1.5 py-0.5 bg-cyan/10 text-brand font-mono rounded">{srcZone?.currency}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-muted mt-1">
+            <ArrowRightIcon size={10} className="opacity-50" />
+            <span className="font-medium text-xs">{dstZone?.name ?? '—'}</span>
+            <span className="text-[10px] px-1.5 py-0.5 bg-cyan/10 text-brand font-mono rounded">{dstZone?.currency}</span>
+          </div>
         </div>
       </td>
       <td className="px-6 py-4">
@@ -200,8 +204,8 @@ function RateRow({
       </td>
       <td className="px-6 py-4">
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${isManual
-            ? 'bg-warning/10 text-warning'
-            : 'bg-brand/10 text-brand'
+          ? 'bg-warning/10 text-warning'
+          : 'bg-brand/10 text-brand'
           }`}>
           {isManual ? <UserIcon size={12} weight="fill" /> : <RobotIcon size={12} weight="fill" />}
           {isManual ? 'Manuel' : 'Automatique'}

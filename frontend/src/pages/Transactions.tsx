@@ -343,26 +343,47 @@ export default function Transactions() {
                       </td>
                       <td className="px-6 py-4 text-sm text-navy font-medium">{tx.recipientName}</td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5 text-sm">
-                          <span className="font-tabular font-semibold text-navy">{formatAmount(tx.sourceAmount, tx.sourceCurrency)}</span>
-                          <ArrowRightIcon size={12} className="text-muted" />
-                          <span className="font-tabular font-semibold text-navy">{formatAmount(tx.destAmount, tx.destCurrency)}</span>
+                        <div className="flex flex-col">
+                          <span className="font-tabular font-semibold text-navy text-sm">
+                            {formatAmount(tx.sourceAmount, tx.sourceCurrency)}
+                          </span>
+                          <div className="flex items-center gap-1 text-[10px] text-muted">
+                            <ArrowRightIcon size={10} />
+                            <span className="font-tabular font-bold text-success">
+                              {formatAmount(tx.destAmount, tx.destCurrency)}
+                            </span>
+                          </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-muted">
-                        {tx.sourceZone?.name ?? '—'} → {tx.destZone?.name ?? '—'}
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col text-xs leading-tight">
+                          <span className="text-navy font-medium">{tx.sourceZone?.name ?? '—'}</span>
+                          <div className="text-muted flex items-center gap-1">
+                            <ArrowRightIcon size={10} className="opacity-50" />
+                            <span>{tx.destZone?.name ?? '—'}</span>
+                          </div>
+                        </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col items-start gap-1">
                           <StatusBadge status={tx.status} />
                           {isPending && tx.expiresAt && (
-                            <span className="text-xs text-warning flex items-center gap-1">
-                              <ClockIcon size={11} /> {timeLeft(tx.expiresAt)}
+                            <span className="text-[10px] text-warning flex items-center gap-1 font-medium px-1">
+                              <ClockIcon size={10} /> {timeLeft(tx.expiresAt)}
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-muted">{formatDate(tx.createdAt)}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col text-xs leading-tight text-muted">
+                          <span className="font-medium text-navy/80">
+                            {new Date(tx.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </span>
+                          <span className="text-[10px] opacity-70">
+                            {new Date(tx.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </td>
                       <td className="px-6 py-4">
                         {isPending && (
                           <div className="flex items-center justify-end gap-2">
