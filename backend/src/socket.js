@@ -8,9 +8,19 @@ let io;
 export function initSocket(httpServer) {
   io = new Server(httpServer, {
     cors: {
-      origin: env.isDev
-        ? ['http://localhost:5173', 'http://localhost:3000']
-        : process.env.FRONTEND_URL,
+      origin: function (origin, callback) {
+        if (!origin) return callback(null, true);
+        if (env.isDev) return callback(null, true);
+
+        const allowedOrigins = process.env.FRONTEND_URL
+          ? process.env.FRONTEND_URL.split(',').map((u) => u.trim().replace(/\/$/, ''))
+          : [];
+
+        if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+        callback(null, false);
+      },
       methods: ['GET', 'POST'],
       credentials: true,
     },

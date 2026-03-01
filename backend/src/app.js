@@ -29,11 +29,21 @@ export function createApp() {
     contentSecurityPolicy: env.isDev ? false : undefined,
   }));
 
+  const allowedOrigins = process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(',').map((u) => u.trim().replace(/\/$/, ''))
+    : [];
+
   // CORS
   app.use(cors({
-    origin: env.isDev
-      ? ['http://localhost:5173', 'http://localhost:3000']
-      : process.env.FRONTEND_URL,
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true); // Mobile apps, Postman
+      if (env.isDev) return callback(null, true); // Dev
+      if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      console.warn(`[CORS Blocked] Origin: ${origin} not in allowed list: ${allowedOrigins.join(', ')}`);
+      callback(null, false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
