@@ -8,6 +8,7 @@ import { BottomTabBar } from './BottomTabBar';
 import { Header } from './Header';
 import { MobileHeader } from './MobileHeader';
 import { ToastContainer } from '../ui/ToastContainer';
+import { useMe } from '@/hooks/useAuth';
 
 export function Layout() {
   const { isAuthenticated } = useAuthStore();
@@ -22,6 +23,16 @@ export function Layout() {
     setQueryClientRef(queryClient);
     connectSocket();
   }, [isAuthenticated, navigate, queryClient]);
+
+  // Sync user data
+  const { data: updatedUser } = useMe();
+  const setUser = useAuthStore(s => s.setUser);
+
+  useEffect(() => {
+    if (updatedUser) {
+      setUser(updatedUser);
+    }
+  }, [updatedUser, setUser]);
 
   if (!isAuthenticated) return null;
 

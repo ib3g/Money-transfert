@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeftIcon, ArrowRightIcon, ArrowsLeftRightIcon, UserIcon,
-  CurrencyDollarIcon, CheckCircleIcon,
+  CurrencyDollarIcon, CheckCircleIcon, WarningIcon,
 } from '@phosphor-icons/react';
 import { useCreateTransaction } from '@/hooks/useTransactions';
 import { useCorridorRate } from '@/hooks/useRates';
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { CodeDisplay } from '@/components/ui/CodeDisplay';
 import type { Transaction } from '@/types';
+import { useMe } from '@/hooks/useAuth'; // Added for user data sync
 
 // ── Step indicator ─────────────────────────────────────────────────────────
 function Steps({ current }: { current: 1 | 2 }) {
@@ -97,7 +98,7 @@ function QuotePreview({
 export default function NewTransaction() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { data: zones } = useZones();
+  const { data: zones, isLoading: isLoadingZones } = useZones(); // Added isLoadingZones
   const createTx = useCreateTransaction();
 
   const [step, setStep] = useState<1 | 2>(1);
@@ -111,11 +112,12 @@ export default function NewTransaction() {
   const [recipientName, setRecipientName] = useState('');
 
   // Source zones: owners/managers see all, agents see only their assigned zones
-  const userZoneIds = user?.zones?.map(uz => uz.zoneId) ?? (user?.zoneId ? [user.zoneId] : []);
+  const userZoneIds = user?.zones?.map(uz => uz.zoneId) ?? [];
   const isOwnerOrManager = user?.role === 'OWNER' || user?.role === 'MANAGER';
+  const isAdmin = isOwnerOrManager || user?.permissions?.includes('FULL_ADMIN');
 
   const allActiveZones = zones?.filter(z => z.isActive) ?? [];
-  const availableZones = isOwnerOrManager
+  const availableZones = isAdmin
     ? allActiveZones
     : allActiveZones.filter(z => userZoneIds.includes(z.id));
 
@@ -153,6 +155,16 @@ export default function NewTransaction() {
     );
   };
 
+  // Sync user data
+  const { data: updatedUser } = useMe();
+  const setUser = useAuthStore(s => s.setUser);
+
+  useEffect(() => {
+    if (updatedUser) {
+      setUser(updatedUser);
+    }
+  }, [updatedUser, setUser]);
+
   // Reset dest zone when source changes
   useEffect(() => {
     if (destZoneId === sourceZoneId) setDestZoneId('');
@@ -179,104 +191,115 @@ export default function NewTransaction() {
 
       {/* Step 1 — Form */}
       {step === 1 && (
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Zone selection */}
-          <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Zone d'envoi</label>
-              <select
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-navy focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-colors"
-                value={sourceZoneId}
-                onChange={e => setSourceZoneId(e.target.value)}
-                required
-              >
-                <option value="">Source…</option>
-                {availableZones.map(z => (
-                  <option key={z.id} value={z.id}>{z.name} ({z.currency})</option>
-                ))}
-              </select>
-            </div>
-            <div className="pb-3">
-              <ArrowsLeftRightIcon size={18} className="text-muted" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Zone de réception</label>
-              <select
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-navy focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-colors"
-                value={destZoneId}
-                onChange={e => setDestZoneId(e.target.value)}
-                required
-                disabled={!sourceZoneId}
-              >
-                <option value="">Destination…</option>
-                {destZones.map(z => (
-                  <option key={z.id} value={z.id}>{z.name} ({z.currency})</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* No rate available */}
-          {sourceZoneId && destZoneId && !corridorRate && (
-            <div className="p-3 bg-warning/5 rounded-xl border border-warning/30 text-sm text-warning">
-              Aucun taux disponible pour ce corridor. Contactez votre administrateur.
+        <>
+          {!isAdmin && availableZones.length === 0 && zones && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3 text-red-700">
+              <WarningIcon size={20} weight="fill" className="shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-bold">Accès restreint</p>
+                <p className="mt-1">Vous n'êtes affecté à aucune zone d'envoi. Veuillez contacter votre administrateur pour être assigné à une zone.</p>
+              </div>
             </div>
           )}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Zone selection */}
+            <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Zone d'envoi</label>
+                <select
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-navy focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-colors"
+                  value={sourceZoneId}
+                  onChange={e => setSourceZoneId(e.target.value)}
+                  required
+                >
+                  <option value="">Source…</option>
+                  {availableZones.map(z => (
+                    <option key={z.id} value={z.id}>{z.name} ({z.currency})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="pb-3">
+                <ArrowsLeftRightIcon size={18} className="text-muted" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Zone de réception</label>
+                <select
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-navy focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-colors"
+                  value={destZoneId}
+                  onChange={e => setDestZoneId(e.target.value)}
+                  required
+                  disabled={!sourceZoneId}
+                >
+                  <option value="">Destination…</option>
+                  {destZones.map(z => (
+                    <option key={z.id} value={z.id}>{z.name} ({z.currency})</option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-          {/* Amount */}
-          <Input
-            label={`Montant à envoyer${srcZone ? ` (${srcZone.currency})` : ''}`}
-            type="number"
-            min="1"
-            step="1"
-            placeholder="ex: 50000"
-            value={sourceAmount}
-            onChange={e => setSourceAmount(e.target.value)}
-            leftIcon={<CurrencyDollarIcon size={16} className="text-muted" />}
-            required
-          />
+            {/* No rate available */}
+            {sourceZoneId && destZoneId && !corridorRate && (
+              <div className="p-3 bg-warning/5 rounded-xl border border-warning/30 text-sm text-warning">
+                Aucun taux disponible pour ce corridor. Contactez votre administrateur.
+              </div>
+            )}
 
-          {/* Sender */}
-          <Input
-            label="Nom de l'expéditeur"
-            placeholder="Prénom NOM"
-            value={senderName}
-            onChange={e => setSenderName(e.target.value)}
-            leftIcon={<UserIcon size={16} className="text-muted" />}
-            required
-          />
-
-          {/* Recipient */}
-          <Input
-            label="Nom du bénéficiaire"
-            placeholder="Prénom NOM"
-            value={recipientName}
-            onChange={e => setRecipientName(e.target.value)}
-            leftIcon={<UserIcon size={16} className="text-muted" />}
-            required
-          />
-
-          {/* Quote preview */}
-          {hasQuote && srcZone && dstZone && (
-            <QuotePreview
-              sourceAmount={amountNum}
-              srcCurrency={srcZone.currency}
-              dstCurrency={dstZone.currency}
-              rate={corridorRate.appliedRate}
-              rateSource={corridorRate.appliedSource}
+            {/* Amount */}
+            <Input
+              label={`Montant à envoyer${srcZone ? ` (${srcZone.currency})` : ''}`}
+              type="number"
+              min="1"
+              step="1"
+              placeholder="ex: 50000"
+              value={sourceAmount}
+              onChange={e => setSourceAmount(e.target.value)}
+              leftIcon={<CurrencyDollarIcon size={16} className="text-muted" />}
+              required
             />
-          )}
 
-          <Button
-            type="submit"
-            className="w-full"
-            size="lg"
-            loading={createTx.isPending}
-            disabled={!canSubmit}
-          >
-            Créer le transfert
-          </Button>
-        </form>
+            {/* Sender */}
+            <Input
+              label="Nom de l'expéditeur"
+              placeholder="Prénom NOM"
+              value={senderName}
+              onChange={e => setSenderName(e.target.value)}
+              leftIcon={<UserIcon size={16} className="text-muted" />}
+              required
+            />
+
+            {/* Recipient */}
+            <Input
+              label="Nom du bénéficiaire"
+              placeholder="Prénom NOM"
+              value={recipientName}
+              onChange={e => setRecipientName(e.target.value)}
+              leftIcon={<UserIcon size={16} className="text-muted" />}
+              required
+            />
+
+            {/* Quote preview */}
+            {hasQuote && srcZone && dstZone && (
+              <QuotePreview
+                sourceAmount={amountNum}
+                srcCurrency={srcZone.currency}
+                dstCurrency={dstZone.currency}
+                rate={corridorRate.appliedRate}
+                rateSource={corridorRate.appliedSource}
+              />
+            )}
+
+            <Button
+              type="submit"
+              className="w-full"
+              size="lg"
+              loading={createTx.isPending}
+              disabled={!canSubmit}
+            >
+              Créer le transfert
+            </Button>
+          </form>
+        </>
       )}
 
       {/* Step 2 — Code display */}
