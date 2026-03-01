@@ -1,0 +1,22 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Dependency directories at root (if any)
+node_modules/
+
+# Logs
+*.log
+
+# Dev databases
+*.sqlite
+*.db
+
+# Docker data
+pgdata/
