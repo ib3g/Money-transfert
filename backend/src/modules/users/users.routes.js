@@ -10,23 +10,23 @@ const router = Router();
 router.use(authenticate);
 
 const createUserSchema = Joi.object({
-  email:     schemas.email,
-  password:  schemas.password,
+  email: schemas.email,
+  password: schemas.password,
   firstName: Joi.string().trim().min(1).max(50).required(),
-  lastName:  Joi.string().trim().min(1).max(50).required(),
-  role:      Joi.string().valid('MANAGER', 'AGENT').required(),
-  zoneIds:   Joi.array().items(Joi.string()).default([]),
+  lastName: Joi.string().trim().min(1).max(50).required(),
+  role: Joi.string().valid('MANAGER', 'AGENT').required(),
+  zoneIds: Joi.array().items(Joi.string()).default([]),
 });
 
 const updateUserSchema = Joi.object({
   firstName: Joi.string().trim().min(1).max(50),
-  lastName:  Joi.string().trim().min(1).max(50),
-  email:     Joi.string().email().lowercase().trim(),
-  isActive:  Joi.boolean(),
-  role:      Joi.string().valid('MANAGER', 'AGENT'),
+  lastName: Joi.string().trim().min(1).max(50),
+  email: Joi.string().email().lowercase().trim(),
+  isActive: Joi.boolean(),
+  role: Joi.string().valid('MANAGER', 'AGENT'),
 }).min(1);
 
-router.get('/',    requirePermission('MANAGE_USERS'), ctrl.list);
+router.get('/', requirePermission('MANAGE_USERS'), ctrl.list);
 router.get('/:id', requirePermission('MANAGE_USERS'), ctrl.getById);
 
 router.post('/',
@@ -43,7 +43,7 @@ router.patch('/:id',
 
 router.delete('/:id',
   requirePermission('MANAGE_USERS'),
-  ctrl.deactivate
+  ctrl.remove
 );
 
 router.patch('/:id/permissions',

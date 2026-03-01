@@ -6,7 +6,7 @@ export const usersApi = {
   byId: (id: string) => apiClient.get<User>(`/users/${id}`),
   create: (data: CreateUserDto) => apiClient.post<User>('/users', data),
   update: (id: string, data: Partial<CreateUserDto>) => apiClient.patch<User>(`/users/${id}`, data),
-  deactivate: (id: string) => apiClient.delete<void>(`/users/${id}`),
+  delete: (id: string) => apiClient.delete<void>(`/users/${id}`),
   updatePermissions: (id: string, permissions: Permission[]) =>
     apiClient.patch<User>(`/users/${id}/permissions`, { permissions }),
   assignZones: (id: string, zoneIds: string[]) =>

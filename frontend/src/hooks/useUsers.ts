@@ -43,13 +43,13 @@ export function useUpdateUser() {
   });
 }
 
-export function useDeactivateUser() {
+export function useDeleteUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: usersApi.deactivate,
+    mutationFn: usersApi.delete,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] });
-      toast.success('Utilisateur désactivé');
+      toast.success('Utilisateur supprimé');
     },
     onError: (err: any) => toast.error('Erreur', err.message),
   });

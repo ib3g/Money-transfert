@@ -8,7 +8,7 @@ let isRefreshing = false;
 let refreshQueue: Array<(token: string) => void> = [];
 
 async function tryRefreshToken(): Promise<boolean> {
-  const { refreshToken, setAccessToken, clearAuth } = useAuthStore.getState();
+  const { refreshToken, setAccessToken, clearAuth, setAuth } = useAuthStore.getState();
   if (!refreshToken) { clearAuth(); return false; }
 
   if (isRefreshing) {
@@ -34,9 +34,12 @@ async function tryRefreshToken(): Promise<boolean> {
 
     const body = await res.json();
     const newToken = body.data?.accessToken ?? body.accessToken;
-    if (!newToken) { clearAuth(); return false; }
+    const newRefresh = body.data?.refreshToken ?? body.refreshToken;
+    const user = body.data?.user ?? body.user;
 
-    setAccessToken(newToken);
+    if (!newToken || !newRefresh || !user) { clearAuth(); return false; }
+
+    setAuth(user, newToken, newRefresh);
     refreshQueue.forEach((cb) => cb(newToken));
     return true;
   } catch {

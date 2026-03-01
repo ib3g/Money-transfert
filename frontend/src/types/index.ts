@@ -54,6 +54,7 @@ export interface User {
   zones?: UserZone[];
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string;
 }
 
 export interface ExchangeRate {
@@ -103,8 +104,8 @@ export interface Transaction {
   cancelReason?: string;
   sourceZone?: Zone;
   destZone?: Zone;
-  senderAgent?: Pick<User, 'id' | 'firstName' | 'lastName'>;
-  receiverAgent?: Pick<User, 'id' | 'firstName' | 'lastName'>;
+  senderAgent?: Pick<User, 'id' | 'firstName' | 'lastName' | 'deletedAt'>;
+  receiverAgent?: Pick<User, 'id' | 'firstName' | 'lastName' | 'deletedAt'>;
   createdAt: string;
   updatedAt: string;
 }
@@ -124,7 +125,7 @@ export interface Notification {
 export interface AuditLog {
   id: string;
   userId: string;
-  user?: Pick<User, 'id' | 'firstName' | 'lastName'>;
+  user?: Pick<User, 'id' | 'firstName' | 'lastName' | 'deletedAt'>;
   action: string;
   entity: string;
   entityId: string;

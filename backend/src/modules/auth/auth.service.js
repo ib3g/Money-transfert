@@ -9,6 +9,9 @@ import { Errors } from '../../utils/errors.js';
 
 const BCRYPT_ROUNDS = 12;
 
+// In-memory cache for graceful refresh token concurrency (grace period: 30s)
+const recentRefreshTokens = new Map();
+
 function signAccessToken(userId, sessionId) {
   return jwt.sign({ userId, sessionId }, env.jwt.secret, { expiresIn: env.jwt.expiresIn });
 }
@@ -126,6 +129,12 @@ export async function verifyTotp({ tempToken, totpCode }) {
 export async function refreshToken(token) {
   if (!token) throw Errors.UNAUTHORIZED();
 
+  // Handle concurrent refresh requests (e.g. multiple tabs or fast retries)
+  // by returning the exact same tokens if this token was just rotated.
+  if (recentRefreshTokens.has(token)) {
+    return recentRefreshTokens.get(token);
+  }
+
   let payload;
   try {
     payload = jwt.verify(token, env.jwt.refreshSecret);
@@ -163,7 +172,13 @@ export async function refreshToken(token) {
     }),
   ]);
 
-  return { accessToken: newAccessToken, refreshToken: newRefreshToken, user: sanitizeUser(user) };
+  const result = { accessToken: newAccessToken, refreshToken: newRefreshToken, user: sanitizeUser(user) };
+
+  // Store the new tokens in the grace period cache for 30 seconds
+  recentRefreshTokens.set(token, result);
+  setTimeout(() => recentRefreshTokens.delete(token), 30000);
+
+  return result;
 }
 
 export async function logout(userId, refreshToken) {
