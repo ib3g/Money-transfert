@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowsLeftRightIcon, PlusIcon, FunnelSimpleIcon, XIcon, MagnifyingGlassIcon,
-  CaretLeftIcon, CaretRightIcon, ArrowRightIcon, ClockIcon,
+  CaretLeftIcon, CaretRightIcon, ArrowRightIcon, ClockIcon, CheckIcon, TrashIcon
 } from '@phosphor-icons/react';
 import { useTransactions, useCancelTransaction } from '@/hooks/useTransactions';
 import { useZones } from '@/hooks/useZones';
@@ -318,18 +318,18 @@ export default function Transactions() {
             ))}
           </div>
 
-          {/* Desktop table */}
-          <div className="hidden lg:block bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <table className="w-full">
+          {/* Desktop table - with horizontal scroll on small desktops */}
+          <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-slate-100 overflow-x-auto">
+            <table className="w-full min-w-[800px] lg:min-w-full">
               <thead>
                 <tr className="bg-surface border-b border-slate-100">
                   <th className="text-left px-6 py-3.5 text-xs font-semibold text-muted uppercase tracking-wider">Code</th>
-                  <th className="text-left px-6 py-3.5 text-xs font-semibold text-muted uppercase tracking-wider">Bénéficiaire</th>
+                  <th className="text-left px-6 py-3.5 text-xs font-semibold text-muted uppercase tracking-wider hidden xl:table-cell">Bénéficiaire</th>
                   <th className="text-left px-6 py-3.5 text-xs font-semibold text-muted uppercase tracking-wider">Montant</th>
                   <th className="text-left px-6 py-3.5 text-xs font-semibold text-muted uppercase tracking-wider">Corridor</th>
                   <th className="text-left px-6 py-3.5 text-xs font-semibold text-muted uppercase tracking-wider">Statut</th>
-                  <th className="text-left px-6 py-3.5 text-xs font-semibold text-muted uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-3.5" />
+                  <th className="text-left px-6 py-3.5 text-xs font-semibold text-muted uppercase tracking-wider hidden 2xl:table-cell">Date</th>
+                  <th className="px-6 py-3.5 text-right font-semibold text-muted uppercase tracking-wider text-[10px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -341,7 +341,12 @@ export default function Transactions() {
                       <td className="px-6 py-4">
                         <span className="font-mono text-sm font-bold text-brand tracking-wider">{tx.code}</span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-navy font-medium">{tx.recipientName}</td>
+                      <td className="px-6 py-4 hidden xl:table-cell">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-navy">{tx.recipientName}</span>
+                          <span className="text-[10px] text-muted">Bénéficiaire</span>
+                        </div>
+                      </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
                           <span className="font-tabular font-semibold text-navy text-sm">
@@ -374,7 +379,7 @@ export default function Transactions() {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 hidden 2xl:table-cell">
                         <div className="flex flex-col text-xs leading-tight text-muted">
                           <span className="font-medium text-navy/80">
                             {new Date(tx.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -385,26 +390,40 @@ export default function Transactions() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        {isPending && (
-                          <div className="flex items-center justify-end gap-2">
-                            {!isSender && (
-                              <button
-                                onClick={() => navigate(`/transactions/confirm?code=${tx.code}`)}
-                                className="text-xs px-3 py-1.5 rounded-lg bg-success/10 text-success font-medium hover:bg-success/20 transition-colors"
-                              >
-                                Confirmer
-                              </button>
-                            )}
-                            {(isSender || canCancel) && (
-                              <button
-                                onClick={() => setCancelTx(tx)}
-                                className="text-xs px-3 py-1.5 rounded-lg bg-danger/5 text-danger font-medium hover:bg-danger/10 transition-colors"
-                              >
-                                Annuler
-                              </button>
-                            )}
-                          </div>
-                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          {isPending ? (
+                            <>
+                              {!isSender && (
+                                <button
+                                  onClick={() => navigate(`/transactions/confirm?code=${tx.code}`)}
+                                  title="Confirmer le transfert"
+                                  className="inline-flex items-center gap-1.5 text-[10px] px-2.5 py-1.5 rounded-lg bg-success/10 text-success font-bold hover:bg-success/20 transition-all active:scale-95 shadow-sm"
+                                >
+                                  <CheckIcon size={12} weight="bold" />
+                                  <span className="hidden lg:inline">Confirmer</span>
+                                </button>
+                              )}
+                              {(isSender || canCancel) && (
+                                <button
+                                  onClick={() => setCancelTx(tx)}
+                                  title="Annuler le transfert"
+                                  className="inline-flex items-center gap-1.5 text-[10px] px-2.5 py-1.5 rounded-lg bg-danger/5 text-danger font-bold hover:bg-danger/10 transition-all active:scale-95 shadow-sm"
+                                >
+                                  <XIcon size={12} weight="bold" />
+                                  <span className="hidden lg:inline">Annuler</span>
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => navigate(`/transactions/confirm?code=${tx.code}`)}
+                              title="Voir les détails"
+                              className="p-2 text-muted-light hover:text-brand hover:bg-brand-light rounded-lg transition-colors"
+                            >
+                              <MagnifyingGlassIcon size={16} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
