@@ -19,8 +19,8 @@ const TRANSACTION_SELECT = {
   createdAt: true, updatedAt: true,
   sourceZone: { select: { id: true, name: true, currency: true } },
   destZone: { select: { id: true, name: true, currency: true } },
-  senderAgent: { select: { id: true, firstName: true, lastName: true } },
-  receiverAgent: { select: { id: true, firstName: true, lastName: true } },
+  senderAgent: { select: { id: true, firstName: true, lastName: true, deletedAt: true } },
+  receiverAgent: { select: { id: true, firstName: true, lastName: true, deletedAt: true } },
 };
 
 /**

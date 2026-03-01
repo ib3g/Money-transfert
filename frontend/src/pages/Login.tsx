@@ -57,7 +57,6 @@ export default function Login() {
 
     try {
       const res = await authApi.login({ email, password });
-      console.log('Login Response:', res);
 
       // Cas 1 : Premier login, doit configurer le 2FA (skip en dev)
       if (res.requireTotpSetup && res.accessToken && res.user) {

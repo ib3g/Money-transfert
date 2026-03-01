@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeftIcon, MagnifyingGlassIcon, ArrowRightIcon, CheckCircleIcon,
-  WarningIcon, UserIcon, ClockIcon,
+  WarningIcon, UserIcon, ClockIcon, InfoIcon,
 } from '@phosphor-icons/react';
 import { useTransactionByCode, useConfirmTransaction } from '@/hooks/useTransactions';
 import { Button } from '@/components/ui/Button';
@@ -24,6 +24,20 @@ function timeLeft(expiresAt: string) {
   const h = Math.floor(diff / 3_600_000);
   const m = Math.floor((diff % 3_600_000) / 60_000);
   return h > 0 ? `${h}h ${m}m restantes` : `${m} minutes restantes`;
+}
+
+function displayAgent(agent?: Pick<import('@/types').User, 'id' | 'firstName' | 'lastName' | 'deletedAt'>, fallback = '—') {
+  if (!agent) return <>{fallback}</>;
+  return (
+    <span className={`inline-flex items-center gap-1.5 align-middle ${agent.deletedAt ? 'text-danger' : ''}`}>
+      {agent.firstName} {agent.lastName}
+      {agent.deletedAt && (
+        <span title="Supprimé de la plateforme" className="flex items-center">
+          <InfoIcon size={14} weight="fill" />
+        </span>
+      )}
+    </span>
+  );
 }
 
 // ── Main page ──────────────────────────────────────────────────────────────
@@ -175,7 +189,7 @@ export default function ConfirmTransaction() {
             </div>
             <div className="flex items-center justify-between px-4 py-3">
               <span className="text-muted">Agent (Envoi)</span>
-              <span className="text-navy">{tx.senderAgent ? `${tx.senderAgent.firstName} ${tx.senderAgent.lastName}` : '—'}</span>
+              <span className="text-navy">{displayAgent(tx.senderAgent)}</span>
             </div>
             <div className="flex items-center justify-between px-4 py-3">
               <span className="text-muted">Montant</span>
@@ -219,7 +233,7 @@ export default function ConfirmTransaction() {
                 <div className="text-muted mt-1 space-y-1 leading-relaxed">
                   {tx.status === 'COMPLETED' ? (
                     <>
-                      <p>Ce transfert a été confirmé par <strong>{tx.receiverAgent ? `${tx.receiverAgent.firstName} ${tx.receiverAgent.lastName}` : 'un agent'}</strong>.</p>
+                      <p className="flex items-center gap-1.5 flex-wrap">Ce transfert a été confirmé par <strong>{displayAgent(tx.receiverAgent, 'un agent')}</strong>.</p>
                       <p className="text-[10px]">Le {new Date(tx.confirmedAt!).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                     </>
                   ) : tx.status === 'CANCELLED' ? (

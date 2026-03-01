@@ -19,6 +19,7 @@ const USER_SELECT = {
   lastActivityAt: true,
   createdAt: true,
   updatedAt: true,
+  deletedAt: true,
   createdById: true,
   zones: {
     select: {
@@ -32,7 +33,7 @@ const USER_SELECT = {
 export async function listUsers(requestingUser) {
   // Owner and managers with MANAGE_USERS see all users
   // Agents see nobody (enforced at route level)
-  const where = {};
+  const where = { deletedAt: null };
 
   // Non-owner managers without FULL_ADMIN can only see users they created
   if (requestingUser.role === 'MANAGER' && !hasPermission(requestingUser, 'FULL_ADMIN')) {
@@ -123,7 +124,7 @@ export async function createUser(data, requestingUser) {
       title: 'Bienvenue sur TransferApp !',
       message: 'Votre compte a été créé. Configurez votre authentification A2F lors de votre première connexion.',
     },
-  }).catch(() => {});
+  }).catch(() => { });
 
   logAudit(
     requestingUser.id,
@@ -165,10 +166,10 @@ export async function updateUser(id, data, requestingUser) {
     where: { id },
     data: {
       ...(data.firstName && { firstName: data.firstName }),
-      ...(data.lastName  && { lastName:  data.lastName }),
-      ...(data.email     && { email:     data.email }),
-      ...(data.role      && { role:      data.role }),
-      ...(data.isActive  !== undefined && { isActive: data.isActive }),
+      ...(data.lastName && { lastName: data.lastName }),
+      ...(data.email && { email: data.email }),
+      ...(data.role && { role: data.role }),
+      ...(data.isActive !== undefined && { isActive: data.isActive }),
     },
     select: USER_SELECT,
   });
@@ -178,7 +179,7 @@ export async function updateUser(id, data, requestingUser) {
   return updated;
 }
 
-export async function deactivateUser(id, requestingUser) {
+export async function deleteUser(id, requestingUser) {
   const target = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } });
   if (!target) throw Errors.USER_NOT_FOUND();
 
@@ -187,14 +188,14 @@ export async function deactivateUser(id, requestingUser) {
 
   const updated = await prisma.user.update({
     where: { id },
-    data: { isActive: false, currentSessionId: null },
+    data: { isActive: false, deletedAt: new Date(), currentSessionId: null },
     select: USER_SELECT,
   });
 
   // Revoke all refresh tokens
   await prisma.refreshToken.deleteMany({ where: { userId: id } });
 
-  logAudit(requestingUser.id, 'USER_DEACTIVATED', 'User', id, null, null);
+  logAudit(requestingUser.id, 'USER_DELETED', 'User', id, null, null);
 
   return updated;
 }

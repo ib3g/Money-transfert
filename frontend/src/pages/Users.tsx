@@ -3,7 +3,7 @@ import {
   UsersIcon, PlusIcon, PencilSimpleIcon, TrashIcon, UserCircleIcon,
   ShieldCheckIcon, XIcon, EyeIcon, EyeSlashIcon, GlobeIcon
 } from '@phosphor-icons/react';
-import { useUsers, useCreateUser, useDeactivateUser, useUpdatePermissions, useAssignZones } from '@/hooks/useUsers';
+import { useUsers, useCreateUser, useDeleteUser, useUpdatePermissions, useAssignZones } from '@/hooks/useUsers';
 import { useZones } from '@/hooks/useZones';
 import { usePermissions } from '@/hooks/usePermissions';
 import { BlankSlate } from '@/components/ui/BlankSlate';
@@ -20,7 +20,7 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 const ALL_PERMISSIONS: { value: Permission; label: string; desc: string }[] = [
-  { value: 'MANAGE_USERS', label: 'Gérer les utilisateurs', desc: 'Créer/modifier/désactiver les agents et managers' },
+  { value: 'MANAGE_USERS', label: 'Gérer les utilisateurs', desc: 'Créer/modifier/supprimer les agents et managers' },
   { value: 'MANAGE_ZONES', label: 'Gérer les zones', desc: 'Créer/modifier les zones (pays)' },
   { value: 'MANAGE_RATES', label: 'Gérer les taux', desc: 'Définir/modifier les taux de change' },
   { value: 'VIEW_ALL_TRANSACTIONS', label: 'Voir toutes les transactions', desc: 'Accès à toutes les transactions' },
@@ -34,12 +34,13 @@ export default function Users() {
   const { isOwner, can } = usePermissions();
   const { data: users, isLoading } = useUsers();
   const { data: zones } = useZones();
-  const deactivate = useDeactivateUser();
+  const removeUser = useDeleteUser();
 
   const [showCreate, setShowCreate] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showPermissions, setShowPermissions] = useState(false);
   const [showZones, setShowZones] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   if (!can('MANAGE_USERS')) {
     return <BlankSlate icon={<ShieldCheckIcon size={32} weight="duotone" />} title="Accès refusé" description="Vous n'avez pas la permission de gérer les utilisateurs." />;
@@ -74,11 +75,7 @@ export default function Users() {
                 isOwner={isOwner}
                 onPermissions={() => { setSelectedUser(user); setShowPermissions(true); }}
                 onZones={() => { setSelectedUser(user); setShowZones(true); }}
-                onDeactivate={() => {
-                  if (confirm(`Désactiver ${user.firstName} ${user.lastName} ?`)) {
-                    deactivate.mutate(user.id);
-                  }
-                }}
+                onDelete={() => setUserToDelete(user)}
               />
             ))}
           </div>
@@ -158,14 +155,10 @@ export default function Users() {
                         )}
                         {user.role !== 'OWNER' && user.isActive && (
                           <button
-                            onClick={() => {
-                              if (confirm(`Désactiver ${user.firstName} ${user.lastName} ?`)) {
-                                deactivate.mutate(user.id);
-                              }
-                            }}
+                            onClick={() => setUserToDelete(user)}
                             className="p-1.5 text-muted-light hover:text-danger hover:bg-danger-bg rounded-lg transition-colors"
-                            aria-label="Désactiver"
-                            title="Désactiver"
+                            aria-label="Supprimer"
+                            title="Supprimer"
                           >
                             <TrashIcon size={15} />
                           </button>
@@ -204,15 +197,28 @@ export default function Users() {
           onClose={() => { setShowZones(false); setSelectedUser(null); }}
         />
       )}
+
+      {/* Delete User Modal */}
+      {userToDelete && (
+        <DeleteUserModal
+          user={userToDelete}
+          onClose={() => setUserToDelete(null)}
+          onConfirm={(id) => {
+            removeUser.mutate(id);
+            setUserToDelete(null);
+          }}
+          isLoading={removeUser.isPending}
+        />
+      )}
     </div>
   );
 }
 
 // ─── Sub-components ────────────────────────────────────────────
 
-function UserCard({ user, isOwner, onPermissions, onZones, onDeactivate }: {
+function UserCard({ user, isOwner, onPermissions, onZones, onDelete }: {
   user: User; isOwner: boolean;
-  onPermissions: () => void; onZones: () => void; onDeactivate: () => void;
+  onPermissions: () => void; onZones: () => void; onDelete: () => void;
 }) {
   return (
     <div className="p-4">
@@ -245,7 +251,7 @@ function UserCard({ user, isOwner, onPermissions, onZones, onDeactivate }: {
             </button>
           )}
           {user.role !== 'OWNER' && user.isActive && (
-            <button onClick={onDeactivate} className="p-2 text-muted-light hover:text-danger rounded-lg" aria-label="Désactiver">
+            <button onClick={onDelete} className="p-2 text-muted-light hover:text-danger rounded-lg" aria-label="Supprimer">
               <TrashIcon size={16} />
             </button>
           )}
@@ -344,8 +350,8 @@ function CreateUserModal({ zones, onClose }: { zones: any[]; onClose: () => void
                   type="button"
                   onClick={() => toggleZone(z.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${form.zoneIds.includes(z.id)
-                      ? 'bg-brand-light border-brand text-brand'
-                      : 'bg-white border-slate-200 text-muted hover:border-brand/30'
+                    ? 'bg-brand-light border-brand text-brand'
+                    : 'bg-white border-slate-200 text-muted hover:border-brand/30'
                     }`}
                 >
                   {z.name} ({z.currency})
@@ -391,8 +397,8 @@ function PermissionsModal({ user, onClose }: { user: User; onClose: () => void }
           <label
             key={p.value}
             className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer border transition-colors ${perms.includes(p.value)
-                ? 'bg-brand-light border-brand/30'
-                : 'bg-surface border-transparent hover:bg-surface-alt'
+              ? 'bg-brand-light border-brand/30'
+              : 'bg-surface border-transparent hover:bg-surface-alt'
               }`}
           >
             <input
@@ -436,8 +442,8 @@ function ZonesModal({ user, allZones, onClose }: { user: User; allZones: any[]; 
           <label
             key={z.id}
             className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border transition-colors ${selected.includes(z.id)
-                ? 'bg-brand-light border-brand/30'
-                : 'bg-surface border-transparent hover:bg-surface-alt'
+              ? 'bg-brand-light border-brand/30'
+              : 'bg-surface border-transparent hover:bg-surface-alt'
               }`}
           >
             <input
@@ -484,5 +490,39 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
         <div className="p-5">{children}</div>
       </div>
     </div>
+  );
+}
+
+function DeleteUserModal({ user, onClose, onConfirm, isLoading }: {
+  user: User;
+  onClose: () => void;
+  onConfirm: (id: string) => void;
+  isLoading: boolean;
+}) {
+  return (
+    <Modal title="Supprimer l'utilisateur" onClose={onClose}>
+      <div className="space-y-4">
+        <div className="flex items-start gap-3 p-4 bg-danger/5 rounded-xl border border-danger/20">
+          <ShieldCheckIcon size={20} weight="fill" className="text-danger shrink-0 mt-0.5" />
+          <p className="text-sm text-slate-700">
+            Êtes-vous sûr de vouloir supprimer <strong className="text-navy">{user.firstName} {user.lastName}</strong> ?
+            Cet utilisateur sera désactivé et n'apparaîtra plus dans cette liste, mais son historique de transactions sera conservé.
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <Button variant="ghost" className="flex-1" onClick={onClose} disabled={isLoading}>
+            Annuler
+          </Button>
+          <Button
+            variant="danger"
+            className="flex-1"
+            loading={isLoading}
+            onClick={() => onConfirm(user.id)}
+          >
+            Supprimer
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }

@@ -29,9 +29,9 @@ export const update = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-export const deactivate = async (req, res, next) => {
+export const remove = async (req, res, next) => {
   try {
-    await usersService.deactivateUser(req.params.id, req.user);
+    await usersService.deleteUser(req.params.id, req.user);
     noContent(res);
   } catch (err) { next(err); }
 };
