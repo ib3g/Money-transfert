@@ -10,6 +10,52 @@ export async function fetchRateFromAPI(fromCurrency, toCurrency) {
   return data.conversion_rate;
 }
 
+// Initialize rates for a newly created zone vs. all existing zones
+export async function refreshRatesForZone(newZone) {
+  const otherZones = await prisma.zone.findMany({
+    where: { isActive: true, id: { not: newZone.id } },
+  });
+
+  let updated = 0;
+  let errors = 0;
+
+  for (const other of otherZones) {
+    // newZone → other
+    try {
+      const rate = await fetchRateFromAPI(newZone.currency, other.currency);
+      await prisma.exchangeRate.updateMany({
+        where: { sourceZoneId: newZone.id, destZoneId: other.id, source: 'API', isActive: true },
+        data: { isActive: false },
+      });
+      await prisma.exchangeRate.create({
+        data: { sourceZoneId: newZone.id, destZoneId: other.id, rate, source: 'API', isActive: true },
+      });
+      updated++;
+    } catch (err) {
+      console.error(`[ZONE_INIT] ${newZone.currency}→${other.currency}: ${err.message}`);
+      errors++;
+    }
+
+    // other → newZone
+    try {
+      const rate = await fetchRateFromAPI(other.currency, newZone.currency);
+      await prisma.exchangeRate.updateMany({
+        where: { sourceZoneId: other.id, destZoneId: newZone.id, source: 'API', isActive: true },
+        data: { isActive: false },
+      });
+      await prisma.exchangeRate.create({
+        data: { sourceZoneId: other.id, destZoneId: newZone.id, rate, source: 'API', isActive: true },
+      });
+      updated++;
+    } catch (err) {
+      console.error(`[ZONE_INIT] ${other.currency}→${newZone.currency}: ${err.message}`);
+      errors++;
+    }
+  }
+
+  return { updated, errors, total: otherZones.length * 2 };
+}
+
 export async function refreshAllRates() {
   // Get all active zones
   const zones = await prisma.zone.findMany({ where: { isActive: true } });

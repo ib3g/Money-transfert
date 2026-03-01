@@ -17,8 +17,15 @@ function signRefreshToken(userId) {
   return jwt.sign({ userId }, env.jwt.refreshSecret, { expiresIn: env.jwt.refreshExpires });
 }
 
+const USER_INCLUDE = {
+  zones: { include: { zone: true } },
+};
+
 export async function login({ email, password }) {
-  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+  const user = await prisma.user.findUnique({
+    where: { email: email.toLowerCase().trim() },
+    include: USER_INCLUDE,
+  });
   if (!user) throw Errors.INVALID_CREDENTIALS();
   if (!user.isActive) throw Errors.USER_INACTIVE();
 
@@ -77,7 +84,10 @@ export async function verifyTotp({ tempToken, totpCode }) {
 
   if (payload.step !== 'totp') throw Errors.UNAUTHORIZED();
 
-  const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+  const user = await prisma.user.findUnique({
+    where: { id: payload.userId },
+    include: USER_INCLUDE,
+  });
   if (!user || !user.isActive) throw Errors.UNAUTHORIZED();
   if (!user.totpSecret || !user.totpEnabled) throw Errors.TOTP_NOT_CONFIGURED();
 
@@ -128,7 +138,10 @@ export async function refreshToken(token) {
     throw Errors.SESSION_EXPIRED();
   }
 
-  const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+  const user = await prisma.user.findUnique({
+    where: { id: payload.userId },
+    include: USER_INCLUDE,
+  });
   if (!user || !user.isActive) throw Errors.UNAUTHORIZED();
 
   const sessionId = uuidv4();
@@ -160,7 +173,7 @@ export async function logout(userId, refreshToken) {
   });
 
   if (refreshToken) {
-    await prisma.refreshToken.deleteMany({ where: { token: refreshToken } }).catch(() => {});
+    await prisma.refreshToken.deleteMany({ where: { token: refreshToken } }).catch(() => { });
   }
 }
 

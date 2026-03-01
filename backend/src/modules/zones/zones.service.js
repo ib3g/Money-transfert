@@ -1,35 +1,30 @@
 import { prisma } from '../../config/database.js';
 import { Errors } from '../../utils/errors.js';
 import { logAudit } from '../../middlewares/auditLog.js';
+import { refreshRatesForZone } from '../../jobs/refreshRates.js';
+import { getIO } from '../../socket.js';
 
 const ZONE_SELECT = {
   id: true, name: true, currency: true, isActive: true,
   createdAt: true, updatedAt: true,
-  _count: { select: { users: true, sourceTransactions: true, destTransactions: true } },
+  _count: {
+    select: {
+      users: true,
+      sourceTransactions: true,
+      destTransactions: true,
+      sourceRates: { where: { isActive: true } },
+    },
+  },
 };
 
-export async function listZones(requestingUser) {
-  // Owner + managers with broad permissions see all zones
-  // Agents and limited managers see only their zones
-  const isAdmin = requestingUser.role === 'OWNER' ||
-    requestingUser.permissions?.includes('FULL_ADMIN') ||
-    requestingUser.permissions?.includes('MANAGE_ZONES') ||
-    requestingUser.permissions?.includes('VIEW_ALL_TRANSACTIONS');
-
-  if (isAdmin) {
-    return prisma.zone.findMany({
-      where: { isActive: true },
-      select: ZONE_SELECT,
-      orderBy: { name: 'asc' },
-    });
-  }
-
-  // Agents/limited managers: only their assigned zones
-  const userZones = await prisma.userZone.findMany({
-    where: { userId: requestingUser.id },
-    select: { zone: { select: ZONE_SELECT } },
+export async function listZones() {
+  // All authenticated users can see the list of active zones
+  // This is needed for rate simulation and choosing destinations
+  return prisma.zone.findMany({
+    where: { isActive: true },
+    select: ZONE_SELECT,
+    orderBy: { name: 'asc' },
   });
-  return userZones.map((uz) => uz.zone).filter((z) => z.isActive);
 }
 
 export async function getZoneById(id) {
@@ -41,7 +36,7 @@ export async function getZoneById(id) {
 export async function createZone(data, requestingUser) {
   const { name, currency } = data;
 
-  const existing = await prisma.zone.findUnique({ where: { name } });
+  const existing = await prisma.zone.findFirst({ where: { name, isActive: true } });
   if (existing) throw Errors.ZONE_NAME_EXISTS();
 
   const zone = await prisma.zone.create({
@@ -50,7 +45,20 @@ export async function createZone(data, requestingUser) {
   });
 
   logAudit(requestingUser.id, 'ZONE_CREATED', 'Zone', zone.id, { name, currency }, null);
-  return zone;
+
+  // Auto-initialize exchange rates with all other active zones
+  let ratesInit = { updated: 0, errors: 0, total: 0 };
+  try {
+    ratesInit = await refreshRatesForZone({ id: zone.id, currency: zone.currency });
+    if (ratesInit.updated > 0) {
+      try { getIO().emit('rate:updated', { reason: 'zone_created', zoneId: zone.id }); } catch { /* not ready */ }
+    }
+  } catch (err) {
+    console.error('[ZONE_INIT]', err.message);
+    ratesInit = { updated: 0, errors: -1, total: 0 };
+  }
+
+  return { ...zone, _init: ratesInit };
 }
 
 export async function updateZone(id, data, requestingUser) {
@@ -65,7 +73,7 @@ export async function updateZone(id, data, requestingUser) {
   const updated = await prisma.zone.update({
     where: { id },
     data: {
-      ...(data.name     && { name:     data.name }),
+      ...(data.name && { name: data.name }),
       ...(data.currency && { currency: data.currency.toUpperCase() }),
       ...(data.isActive !== undefined && { isActive: data.isActive }),
     },
@@ -93,6 +101,12 @@ export async function deleteZone(id, requestingUser) {
     where: { id },
     data: { isActive: false },
     select: ZONE_SELECT,
+  });
+
+  // Deactivate all exchange rates associated with this zone
+  await prisma.exchangeRate.updateMany({
+    where: { OR: [{ sourceZoneId: id }, { destZoneId: id }], isActive: true },
+    data: { isActive: false },
   });
 
   logAudit(requestingUser.id, 'ZONE_DEACTIVATED', 'Zone', id, null, null);

@@ -1,4 +1,4 @@
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { BellIcon, BellRingingIcon } from '@phosphor-icons/react';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { useUiStore } from '@/stores/uiStore';
@@ -32,8 +32,8 @@ export function Header() {
         {/* WS Status */}
         <div className="flex items-center gap-1.5">
           <span className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-success-light animate-pulse-dot' :
-              wsReconnecting ? 'bg-warning-light animate-pulse' :
-                'bg-danger-light'
+            wsReconnecting ? 'bg-warning-light animate-pulse' :
+              'bg-danger-light'
             }`} />
           {!wsConnected && (
             <span className="text-xs text-muted hidden sm:block">
@@ -43,7 +43,7 @@ export function Header() {
         </div>
 
         {/* Notification Bell */}
-        <a href="/notifications" className="relative p-2 rounded-xl hover:bg-surface-alt transition-colors" aria-label="Notifications">
+        <Link to="/notifications" className="relative p-2 rounded-xl hover:bg-surface-alt transition-colors" aria-label="Notifications">
           {unreadCount > 0
             ? <BellRingingIcon size={20} weight="fill" className="text-brand" />
             : <BellIcon size={20} weight="regular" className="text-muted" />
@@ -53,17 +53,23 @@ export function Header() {
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
-        </a>
+        </Link>
 
-        {/* Avatar */}
-        <div className="flex items-center gap-2 pl-2 border-l border-slate-100">
-          <div className="w-8 h-8 bg-brand-light rounded-full flex items-center justify-center">
+        {/* Avatar → Clickable to profile */}
+        <Link
+          to="/profile"
+          className="flex items-center gap-2 pl-4 border-l border-slate-100 group transition-colors"
+          title="Mon profil"
+        >
+          <div className="w-8 h-8 bg-brand-light rounded-full flex items-center justify-center group-hover:ring-2 group-hover:ring-brand/30 transition-all">
             <span className="text-xs font-bold text-brand">
               {user?.firstName?.[0]}{user?.lastName?.[0]}
             </span>
           </div>
-          <span className="text-sm font-medium text-navy hidden sm:block">{user?.firstName}</span>
-        </div>
+          <span className="text-sm font-medium text-navy hidden sm:block group-hover:text-brand transition-colors">
+            {user?.firstName}
+          </span>
+        </Link>
       </div>
     </header>
   );

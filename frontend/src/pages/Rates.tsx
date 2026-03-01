@@ -303,10 +303,15 @@ export default function Rates() {
   const [showCreate, setShowCreate] = useState(false);
   const [editRate, setEditRate] = useState<ExchangeRate | null>(null);
   const [deleteRate, setDeleteRate] = useState<ExchangeRate | null>(null);
+  const [filterZoneId, setFilterZoneId] = useState('');
 
   const isLoading = loadingRates || loadingZones;
-  const manualRates = rates?.filter(r => r.source === 'MANUAL') ?? [];
-  const autoRates = rates?.filter(r => r.source === 'API') ?? [];
+
+  const matchesFilter = (r: ExchangeRate) =>
+    !filterZoneId || r.sourceZoneId === filterZoneId || r.destZoneId === filterZoneId;
+
+  const manualRates = (rates?.filter(r => r.source === 'MANUAL') ?? []).filter(matchesFilter);
+  const autoRates   = (rates?.filter(r => r.source === 'API')    ?? []).filter(matchesFilter);
 
   return (
     <div className="animate-fade-in">
@@ -315,7 +320,10 @@ export default function Rates() {
         <div>
           <h1 className="text-2xl font-bold text-navy">Taux de change</h1>
           <p className="text-sm text-muted mt-0.5">
-            {isLoading ? '…' : `${rates?.length ?? 0} corridor${(rates?.length ?? 0) !== 1 ? 's' : ''} · ${manualRates.length} manuel${manualRates.length !== 1 ? 's' : ''}`}
+            {isLoading ? '…' : filterZoneId
+              ? `${manualRates.length + autoRates.length} / ${rates?.length ?? 0} corridors affichés`
+              : `${rates?.length ?? 0} corridor${(rates?.length ?? 0) !== 1 ? 's' : ''} · ${(rates?.filter(r => r.source === 'MANUAL') ?? []).length} manuel${(rates?.filter(r => r.source === 'MANUAL') ?? []).length !== 1 ? 's' : ''}`
+            }
           </p>
         </div>
         {canManage && (
@@ -339,6 +347,30 @@ export default function Rates() {
         )}
       </div>
 
+      {/* Zone filter */}
+      {!isLoading && !!rates?.length && !!zones?.length && (
+        <div className="flex items-center gap-3 mb-5">
+          <label className="text-xs font-medium text-muted whitespace-nowrap">Filtrer par zone :</label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setFilterZoneId('')}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${!filterZoneId ? 'bg-brand text-white shadow-sm' : 'bg-surface-alt text-muted hover:text-navy hover:bg-slate-200'}`}
+            >
+              Toutes
+            </button>
+            {zones.filter(z => z.isActive).map(z => (
+              <button
+                key={z.id}
+                onClick={() => setFilterZoneId(filterZoneId === z.id ? '' : z.id)}
+                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${filterZoneId === z.id ? 'bg-brand text-white shadow-sm' : 'bg-surface-alt text-muted hover:text-navy hover:bg-slate-200'}`}
+              >
+                {z.name} <span className="opacity-70 font-mono">{z.currency}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Legend */}
       {!isLoading && !!rates?.length && (
         <div className="flex items-center gap-4 mb-5 text-xs text-muted">
@@ -355,6 +387,16 @@ export default function Rates() {
       {isLoading && (
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 rounded-2xl" />)}
+        </div>
+      )}
+
+      {/* Empty after filter */}
+      {!isLoading && !!rates?.length && filterZoneId && manualRates.length === 0 && autoRates.length === 0 && (
+        <div className="text-center py-10 text-sm text-muted bg-white rounded-2xl border border-slate-100">
+          Aucun taux trouvé pour la zone sélectionnée.{' '}
+          <button onClick={() => setFilterZoneId('')} className="text-brand hover:underline font-medium">
+            Effacer le filtre
+          </button>
         </div>
       )}
 

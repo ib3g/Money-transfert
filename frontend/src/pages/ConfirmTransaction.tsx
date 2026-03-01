@@ -8,6 +8,8 @@ import { useTransactionByCode, useConfirmTransaction } from '@/hooks/useTransact
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { useAuthStore } from '@/stores/authStore';
+import { Link } from 'react-router-dom';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function formatAmount(n: number, currency: string) {
@@ -27,6 +29,7 @@ function timeLeft(expiresAt: string) {
 // ── Main page ──────────────────────────────────────────────────────────────
 export default function ConfirmTransaction() {
   const navigate = useNavigate();
+  const user = useAuthStore(s => s.user);
   const [searchParams] = useSearchParams();
   const codeParam = searchParams.get('code') ?? '';
 
@@ -233,7 +236,7 @@ export default function ConfirmTransaction() {
           )}
 
           {/* Confirm button */}
-          {tx.status === 'PENDING' && (
+          {tx.status === 'PENDING' && tx.senderAgentId !== user?.id && (
             <Button
               className="w-full shadow-lg shadow-brand/20 active:scale-[0.98] transition-all"
               size="lg"
@@ -243,6 +246,27 @@ export default function ConfirmTransaction() {
               <CheckCircleIcon size={20} weight="fill" />
               Confirmer le paiement de {formatAmount(tx.destAmount, tx.destCurrency)}
             </Button>
+          )}
+
+          {tx.status === 'PENDING' && tx.senderAgentId === user?.id && (
+            <div className="space-y-4">
+              <div className="p-4 bg-warning/5 border border-warning/20 rounded-2xl flex items-start gap-3">
+                <WarningIcon size={20} weight="fill" className="text-warning shrink-0" />
+                <div className="text-sm">
+                  <p className="font-bold text-navy">Action non autorisée</p>
+                  <p className="text-muted mt-1 leading-relaxed">
+                    Vous ne pouvez pas confirmer un transfert que vous avez émis vous-même.
+                    Un autre agent doit s'en charger.
+                  </p>
+                </div>
+              </div>
+              <Link
+                to={`/transactions?code=${tx.code}`}
+                className="block w-full text-center bg-danger/5 text-danger text-sm font-semibold py-3 rounded-xl hover:bg-danger/10 transition-colors"
+              >
+                Annuler ce transfert
+              </Link>
+            </div>
           )}
 
           <button

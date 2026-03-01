@@ -110,20 +110,22 @@ export default function NewTransaction() {
   const [senderName, setSenderName] = useState('');
   const [recipientName, setRecipientName] = useState('');
 
-  // User's accessible zones (agents see only their zones)
-  const userZoneIds = user?.zones?.map(uz => uz.zoneId) ?? [];
+  // Source zones: owners/managers see all, agents see only their assigned zones
+  const userZoneIds = user?.zones?.map(uz => uz.zoneId) ?? (user?.zoneId ? [user.zoneId] : []);
   const isOwnerOrManager = user?.role === 'OWNER' || user?.role === 'MANAGER';
 
-  const availableZones = zones?.filter(z => z.isActive && (
-    isOwnerOrManager || userZoneIds.includes(z.id)
-  )) ?? [];
+  const allActiveZones = zones?.filter(z => z.isActive) ?? [];
+  const availableZones = isOwnerOrManager
+    ? allActiveZones
+    : allActiveZones.filter(z => userZoneIds.includes(z.id));
 
-  const destZones = availableZones.filter(z => z.id !== sourceZoneId);
+  // Destination: always all active zones except the selected source
+  const destZones = allActiveZones.filter(z => z.id !== sourceZoneId);
 
   const { data: corridorRate } = useCorridorRate(sourceZoneId, destZoneId);
 
-  const srcZone = availableZones.find(z => z.id === sourceZoneId);
-  const dstZone = availableZones.find(z => z.id === destZoneId);
+  const srcZone = allActiveZones.find(z => z.id === sourceZoneId);
+  const dstZone = allActiveZones.find(z => z.id === destZoneId);
   const amountNum = parseFloat(sourceAmount);
   const hasQuote = !!corridorRate && !!amountNum && amountNum > 0;
 

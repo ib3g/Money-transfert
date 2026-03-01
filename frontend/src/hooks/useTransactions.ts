@@ -34,6 +34,7 @@ export function useCreateTransaction() {
     mutationFn: (data: CreateTransactionDto) => transactionsApi.create(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['transactions'] });
+      qc.invalidateQueries({ queryKey: ['stats'] });
     },
     onError: (err: any) => toast.error('Erreur', err.message),
   });
@@ -45,6 +46,7 @@ export function useConfirmTransaction() {
     mutationFn: (id: string) => transactionsApi.confirm(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['transactions'] });
+      qc.invalidateQueries({ queryKey: ['stats'] });
       toast.success('Transaction confirmée', 'Le transfert a été validé avec succès.');
     },
     onError: (err: any) => toast.error('Erreur', err.message),
@@ -58,6 +60,7 @@ export function useCancelTransaction() {
       transactionsApi.cancel(id, reason),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['transactions'] });
+      qc.invalidateQueries({ queryKey: ['stats'] });
       toast.success('Transaction annulée');
     },
     onError: (err: any) => toast.error('Erreur', err.message),

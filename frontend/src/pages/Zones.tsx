@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   GlobeIcon, PlusIcon, PencilSimpleIcon, TrashIcon, MapPinIcon, XIcon, WarningIcon,
+  ChartLineUpIcon,
 } from '@phosphor-icons/react';
 import { useZones, useCreateZone, useUpdateZone } from '@/hooks/useZones';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -11,7 +12,23 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { BlankSlate } from '@/components/ui/BlankSlate';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { Link } from 'react-router-dom';
 import type { Zone } from '@/types';
+
+// Badge shown on zones that have no initialized API rates (config incomplete)
+function NoRatesBadge() {
+  return (
+    <Link
+      to="/rates"
+      className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-warning-bg text-warning hover:bg-warning/20 transition-colors whitespace-nowrap"
+      title="Taux non initialisés — cliquez pour configurer"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <WarningIcon size={10} weight="fill" />
+      Taux manquants
+    </Link>
+  );
+}
 
 // ── Shared Modal shell ─────────────────────────────────────────────────────
 function Modal({
@@ -180,8 +197,8 @@ function DeleteModal({ zone, onClose }: { zone: Zone; onClose: () => void }) {
 
 // ── Zone card (mobile) ─────────────────────────────────────────────────────
 function ZoneCard({
-  zone, canManage, onEdit, onDelete,
-}: { zone: Zone; canManage: boolean; onEdit: () => void; onDelete: () => void }) {
+  zone, canManage, onEdit, onDelete, showNoRates,
+}: { zone: Zone; canManage: boolean; onEdit: () => void; onDelete: () => void; showNoRates?: boolean }) {
   const qc = useQueryClient();
   const toggle = useMutation({
     mutationFn: () => zonesApi.update(zone.id, { isActive: !zone.isActive }),
@@ -197,7 +214,10 @@ function ZoneCard({
             <GlobeIcon size={20} weight="duotone" className={zone.isActive ? 'text-brand' : 'text-slate-400'} />
           </div>
           <div>
-            <p className="font-semibold text-navy text-sm">{zone.name}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-semibold text-navy text-sm">{zone.name}</p>
+              {showNoRates && <NoRatesBadge />}
+            </div>
             <span className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 bg-cyan/10 text-brand text-xs font-mono font-semibold rounded-md">
               {zone.currency}
             </span>
@@ -241,6 +261,8 @@ export default function Zones() {
 
   const activeZones = zones?.filter(z => z.isActive) ?? [];
   const inactiveZones = zones?.filter(z => !z.isActive) ?? [];
+  const multipleZones = (zones?.length ?? 0) > 1;
+  const hasNoRates = (z: Zone) => multipleZones && z.isActive && (z._count?.sourceRates ?? 1) === 0;
 
   const qc = useQueryClient();
   const toggleZone = useMutation({
@@ -295,7 +317,7 @@ export default function Zones() {
               <h2 className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Actives ({activeZones.length})</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {activeZones.map(z => (
-                  <ZoneCard key={z.id} zone={z} canManage={canManage}
+                  <ZoneCard key={z.id} zone={z} canManage={canManage} showNoRates={hasNoRates(z)}
                     onEdit={() => setEditZone(z)} onDelete={() => setDeleteZone(z)} />
                 ))}
               </div>
@@ -335,10 +357,13 @@ export default function Zones() {
                 <tr key={zone.id} className="hover:bg-surface/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${zone.isActive ? 'bg-brand/10' : 'bg-slate-100'}`}>
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${zone.isActive ? 'bg-brand/10' : 'bg-slate-100'}`}>
                         <GlobeIcon size={16} weight="duotone" className={zone.isActive ? 'text-brand' : 'text-slate-400'} />
                       </div>
-                      <span className="font-medium text-navy text-sm">{zone.name}</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-navy text-sm">{zone.name}</span>
+                        {hasNoRates(zone) && <NoRatesBadge />}
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">

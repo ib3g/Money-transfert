@@ -52,6 +52,7 @@ export function connectSocket(): void {
   socket.on('transaction:updated', (update: { id: string; status: string }) => {
     queryClientRef?.invalidateQueries({ queryKey: ['transactions', update.id] });
     queryClientRef?.invalidateQueries({ queryKey: ['transactions'] });
+    queryClientRef?.invalidateQueries({ queryKey: ['stats'] });
   });
 
   socket.on('rate:updated', () => {

@@ -26,6 +26,12 @@ export interface Zone {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  _count?: {
+    users?: number;
+    sourceTransactions?: number;
+    destTransactions?: number;
+    sourceRates?: number;
+  };
 }
 
 export interface UserZone {
