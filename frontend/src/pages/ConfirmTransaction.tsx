@@ -69,8 +69,14 @@ export default function ConfirmTransaction() {
           <ArrowLeftIcon size={18} />
         </button>
         <div>
-          <h1 className="text-xl font-bold text-navy">Confirmer un transfert</h1>
-          <p className="text-xs text-muted">Saisissez le code de retrait communiqué par l'expéditeur</p>
+          <h1 className="text-xl font-bold text-navy">
+            {tx && tx.status !== 'PENDING' ? 'Détails du transfert' : 'Confirmer un transfert'}
+          </h1>
+          <p className="text-xs text-muted">
+            {tx && tx.status !== 'PENDING'
+              ? `Consultation de la transaction ${tx.code}`
+              : 'Saisissez le code de retrait communiqué par l\'expéditeur'}
+          </p>
         </div>
       </div>
 
@@ -156,8 +162,17 @@ export default function ConfirmTransaction() {
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm divide-y divide-slate-100 text-sm">
             <div className="flex items-center gap-3 px-4 py-3">
               <UserIcon size={16} className="text-muted shrink-0" />
+              <span className="text-muted">Expéditeur</span>
+              <span className="font-semibold text-navy ml-auto">{tx.senderName}</span>
+            </div>
+            <div className="flex items-center gap-3 px-4 py-3">
+              <UserIcon size={16} className="text-muted shrink-0" />
               <span className="text-muted">Bénéficiaire</span>
               <span className="font-semibold text-navy ml-auto">{tx.recipientName}</span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-muted">Agent (Envoi)</span>
+              <span className="text-navy">{tx.senderAgent ? `${tx.senderAgent.firstName} ${tx.senderAgent.lastName}` : '—'}</span>
             </div>
             <div className="flex items-center justify-between px-4 py-3">
               <span className="text-muted">Montant</span>
@@ -171,10 +186,6 @@ export default function ConfirmTransaction() {
               <span className="text-muted">Corridor</span>
               <span className="text-navy">{tx.sourceZone?.name ?? '—'} → {tx.destZone?.name ?? '—'}</span>
             </div>
-            <div className="flex items-center justify-between px-4 py-3">
-              <span className="text-muted">Expéditeur</span>
-              <span className="text-navy">{tx.senderAgent ? `${tx.senderAgent.firstName} ${tx.senderAgent.lastName}` : '—'}</span>
-            </div>
             {tx.status === 'PENDING' && tx.expiresAt && (
               <div className="flex items-center gap-2 px-4 py-3">
                 <ClockIcon size={14} className="text-warning shrink-0" />
@@ -187,23 +198,49 @@ export default function ConfirmTransaction() {
 
           {/* Not pending — show info */}
           {tx.status !== 'PENDING' && (
-            <div className="flex items-start gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200 text-sm">
-              <WarningIcon size={18} weight="fill" className="text-muted shrink-0 mt-0.5" />
-              <p className="text-muted">
-                Cette transaction ne peut plus être confirmée — elle est <strong>{tx.status === 'COMPLETED' ? 'déjà complétée' : tx.status === 'CANCELLED' ? 'annulée' : 'expirée'}</strong>.
-              </p>
+            <div className="flex items-start gap-3 p-4 bg-surface rounded-2xl border border-slate-100 text-sm shadow-sm relative overflow-hidden group">
+              {tx.status === 'COMPLETED' ? (
+                <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <CheckCircleIcon size={48} weight="fill" className="text-success" />
+                </div>
+              ) : (
+                <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <WarningIcon size={48} weight="fill" className="text-muted" />
+                </div>
+              )}
+              <div className="relative z-10">
+                <p className="font-semibold text-navy flex items-center gap-2">
+                  {tx.status === 'COMPLETED' && <CheckCircleIcon size={16} weight="fill" className="text-success" />}
+                  {tx.status === 'COMPLETED' ? 'Transaction déjà payée' : tx.status === 'CANCELLED' ? 'Transaction annulée' : 'Transaction expirée'}
+                </p>
+                <div className="text-muted mt-1 space-y-1 leading-relaxed">
+                  {tx.status === 'COMPLETED' ? (
+                    <>
+                      <p>Ce transfert a été confirmé par <strong>{tx.receiverAgent ? `${tx.receiverAgent.firstName} ${tx.receiverAgent.lastName}` : 'un agent'}</strong>.</p>
+                      <p className="text-[10px]">Le {new Date(tx.confirmedAt!).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                    </>
+                  ) : tx.status === 'CANCELLED' ? (
+                    <>
+                      <p>Ce transfert a été annulé{tx.cancelReason ? ` : "${tx.cancelReason}"` : '.'}</p>
+                      {tx.cancelledAt && <p className="text-[10px]">Le {new Date(tx.cancelledAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>}
+                    </>
+                  ) : (
+                    <p>Le délai de retrait pour ce transfert est dépassé.</p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
           {/* Confirm button */}
           {tx.status === 'PENDING' && (
             <Button
-              className="w-full"
+              className="w-full shadow-lg shadow-brand/20 active:scale-[0.98] transition-all"
               size="lg"
               onClick={handleConfirm}
               loading={confirm.isPending}
             >
-              <CheckCircleIcon size={18} weight="fill" />
+              <CheckCircleIcon size={20} weight="fill" />
               Confirmer le paiement de {formatAmount(tx.destAmount, tx.destCurrency)}
             </Button>
           )}

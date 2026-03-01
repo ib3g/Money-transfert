@@ -37,7 +37,7 @@ export default function Login() {
   const [error, setError] = useState('');
 
   if (isAuthenticated) {
-    if (user && !user.totpEnabled) return <Navigate to="/setup-2fa" replace />;
+    if (user && !user.totpEnabled && !import.meta.env.DEV) return <Navigate to="/setup-2fa" replace />;
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -57,10 +57,16 @@ export default function Login() {
       const res = await authApi.login({ email, password });
       console.log('Login Response:', res);
 
-      // Cas 1 : Premier login, doit configurer le 2FA
+      // Cas 1 : Premier login, doit configurer le 2FA (skip en dev)
       if (res.requireTotpSetup && res.accessToken && res.user) {
         setAuth(res.user, res.accessToken, res.refreshToken!);
-        navigate('/setup-2fa');
+        connectSocket();
+        if (import.meta.env.DEV) {
+          navigate('/dashboard');
+          toast.success('Bienvenue !', `Bonjour ${res.user.firstName} (2FA skippé en dev)`);
+        } else {
+          navigate('/setup-2fa');
+        }
         return;
       }
 

@@ -107,6 +107,7 @@ export default function NewTransaction() {
   const [sourceZoneId, setSourceZoneId] = useState('');
   const [destZoneId, setDestZoneId] = useState('');
   const [sourceAmount, setSourceAmount] = useState('');
+  const [senderName, setSenderName] = useState('');
   const [recipientName, setRecipientName] = useState('');
 
   // User's accessible zones (agents see only their zones)
@@ -128,7 +129,7 @@ export default function NewTransaction() {
 
   const canSubmit =
     sourceZoneId && destZoneId && sourceZoneId !== destZoneId &&
-    amountNum > 0 && recipientName.trim() && corridorRate;
+    amountNum > 0 && senderName.trim() && recipientName.trim() && corridorRate;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,6 +139,7 @@ export default function NewTransaction() {
         sourceAmount: amountNum,
         sourceZoneId,
         destZoneId,
+        senderName: senderName.trim(),
         recipientName: recipientName.trim(),
       },
       {
@@ -232,6 +234,16 @@ export default function NewTransaction() {
             required
           />
 
+          {/* Sender */}
+          <Input
+            label="Nom de l'expéditeur"
+            placeholder="Prénom NOM"
+            value={senderName}
+            onChange={e => setSenderName(e.target.value)}
+            leftIcon={<UserIcon size={16} className="text-muted" />}
+            required
+          />
+
           {/* Recipient */}
           <Input
             label="Nom du bénéficiaire"
@@ -282,6 +294,10 @@ export default function NewTransaction() {
 
           <div className="bg-surface rounded-2xl border border-slate-100 divide-y divide-slate-100 text-sm">
             <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-muted">Expéditeur</span>
+              <span className="font-semibold text-navy">{created.senderName}</span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3">
               <span className="text-muted">Bénéficiaire</span>
               <span className="font-semibold text-navy">{created.recipientName}</span>
             </div>
@@ -317,6 +333,7 @@ export default function NewTransaction() {
               setSourceZoneId('');
               setDestZoneId('');
               setSourceAmount('');
+              setSenderName('');
               setRecipientName('');
             }}>
               Nouveau transfert

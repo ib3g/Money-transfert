@@ -1,7 +1,7 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
   HouseIcon, ArrowsLeftRightIcon, UsersIcon, GlobeIcon, ChartLineUpIcon,
-  FilePdfIcon, ShieldCheckIcon, BellIcon, UserCircleIcon, SignOutIcon
+  FilePdfIcon, ShieldCheckIcon, BellIcon, SignOutIcon
 } from '@phosphor-icons/react';
 import { useCurrentUser } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -18,6 +18,7 @@ export function Sidebar() {
   const user = useCurrentUser();
   const { can } = usePermissions();
   const logout = useLogout();
+  const navigate = useNavigate();
 
   const mainNav: NavItem[] = [
     { label: 'Dashboard', to: '/dashboard', icon: <HouseIcon size={18} /> },
@@ -68,19 +69,27 @@ export function Sidebar() {
       {/* User profile */}
       <div className="p-3 border-t border-white/10">
         <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors">
-          <div className="w-9 h-9 bg-brand/30 rounded-full flex items-center justify-center flex-shrink-0">
-            <UserCircleIcon size={20} weight="fill" className="text-cyan-dim" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-white truncate">
-              {user?.firstName} {user?.lastName}
-            </p>
-            <p className="text-xs text-slate-400 capitalize">{user?.role?.toLowerCase()}</p>
-          </div>
+          <button
+            onClick={() => navigate('/profile')}
+            className="flex items-center gap-3 flex-1 min-w-0 text-left"
+            aria-label="Mon profil"
+          >
+            <div className="w-9 h-9 bg-brand/30 rounded-full flex items-center justify-center flex-shrink-0">
+              <span className="text-sm font-bold text-cyan-dim leading-none">
+                {user?.firstName?.[0]}{user?.lastName?.[0]}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white truncate">
+                {user?.firstName} {user?.lastName}
+              </p>
+              <p className="text-xs text-slate-400 capitalize">{user?.role?.toLowerCase()}</p>
+            </div>
+          </button>
           <button
             onClick={logout}
             aria-label="Déconnexion"
-            className="p-1.5 text-slate-500 hover:text-danger-light hover:bg-white/5 rounded-lg transition-colors"
+            className="p-1.5 text-slate-500 hover:text-danger-light hover:bg-white/5 rounded-lg transition-colors flex-shrink-0"
           >
             <SignOutIcon size={16} />
           </button>

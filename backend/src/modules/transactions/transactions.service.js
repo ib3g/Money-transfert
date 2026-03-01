@@ -12,13 +12,14 @@ const TRANSACTION_SELECT = {
   appliedRate: true, rateSource: true,
   sourceZoneId: true, destZoneId: true,
   senderAgentId: true, receiverAgentId: true,
+  senderName: true,
   recipientName: true, status: true,
   expiresAt: true, confirmedAt: true,
   cancelledAt: true, cancelReason: true,
   createdAt: true, updatedAt: true,
-  sourceZone:    { select: { id: true, name: true, currency: true } },
-  destZone:      { select: { id: true, name: true, currency: true } },
-  senderAgent:   { select: { id: true, firstName: true, lastName: true } },
+  sourceZone: { select: { id: true, name: true, currency: true } },
+  destZone: { select: { id: true, name: true, currency: true } },
+  senderAgent: { select: { id: true, firstName: true, lastName: true } },
   receiverAgent: { select: { id: true, firstName: true, lastName: true } },
 };
 
@@ -35,16 +36,18 @@ function buildVisibilityFilter(user) {
     return {
       OR: [
         { sourceZoneId: { in: zoneIds } },
-        { destZoneId:   { in: zoneIds } },
+        { destZoneId: { in: zoneIds } },
       ],
     };
   }
 
-  // Agent: only their own transactions
+  // Agent: their own transactions OR transactions in their zones
+  const zoneIds = user.zones?.map((uz) => uz.zoneId) ?? [];
   return {
     OR: [
-      { senderAgentId:   user.id },
+      { senderAgentId: user.id },
       { receiverAgentId: user.id },
+      { destZoneId: { in: zoneIds } },
     ],
   };
 }
@@ -52,17 +55,17 @@ function buildVisibilityFilter(user) {
 export async function listTransactions(filters = {}, requestingUser) {
   const { status, sourceZoneId, destZoneId, agentId, from, to, page = 1, limit = 20 } = filters;
 
-  const pageNum  = Math.max(1, parseInt(page, 10));
+  const pageNum = Math.max(1, parseInt(page, 10));
   const pageSize = Math.min(100, Math.max(1, parseInt(limit, 10)));
 
   const where = {
     ...buildVisibilityFilter(requestingUser),
-    ...(status       && { status }),
+    ...(status && { status }),
     ...(sourceZoneId && { sourceZoneId }),
-    ...(destZoneId   && { destZoneId }),
-    ...(agentId      && { OR: [{ senderAgentId: agentId }, { receiverAgentId: agentId }] }),
-    ...(from         && { createdAt: { gte: new Date(from) } }),
-    ...(to           && { createdAt: { ...(from ? { gte: new Date(from) } : {}), lte: new Date(to) } }),
+    ...(destZoneId && { destZoneId }),
+    ...(agentId && { OR: [{ senderAgentId: agentId }, { receiverAgentId: agentId }] }),
+    ...(from && { createdAt: { gte: new Date(from) } }),
+    ...(to && { createdAt: { ...(from ? { gte: new Date(from) } : {}), lte: new Date(to) } }),
   };
 
   const [data, total] = await Promise.all([
@@ -109,15 +112,18 @@ export async function getTransactionByCode(code, requestingUser) {
   });
   if (!tx) throw Errors.INVALID_CODE();
 
-  // Check status
-  if (tx.status === 'COMPLETED') throw Errors.ALREADY_CONFIRMED();
-  if (tx.status === 'CANCELLED' || tx.status === 'EXPIRED') throw Errors.TRANSACTION_NOT_PENDING();
+  // Visibility check
+  const visFilter = buildVisibilityFilter(requestingUser);
+  if (Object.keys(visFilter).length > 0) {
+    const count = await prisma.transaction.count({ where: { id: tx.id, ...visFilter } });
+    if (count === 0) throw Errors.FORBIDDEN();
+  }
 
   return tx;
 }
 
 export async function createTransaction(data, requestingUser) {
-  const { sourceAmount, sourceZoneId, destZoneId, recipientName } = data;
+  const { sourceAmount, sourceZoneId, destZoneId, senderName, recipientName } = data;
 
   if (sourceZoneId === destZoneId) throw Errors.SAME_ZONE();
 
@@ -130,10 +136,10 @@ export async function createTransaction(data, requestingUser) {
   // Get zones
   const [sourceZone, destZone] = await Promise.all([
     prisma.zone.findUnique({ where: { id: sourceZoneId, isActive: true } }),
-    prisma.zone.findUnique({ where: { id: destZoneId,   isActive: true } }),
+    prisma.zone.findUnique({ where: { id: destZoneId, isActive: true } }),
   ]);
   if (!sourceZone) throw Errors.ZONE_NOT_FOUND();
-  if (!destZone)   throw Errors.ZONE_NOT_FOUND();
+  if (!destZone) throw Errors.ZONE_NOT_FOUND();
 
   // Resolve exchange rate (MANUAL > API)
   const rates = await prisma.exchangeRate.findMany({
@@ -142,7 +148,7 @@ export async function createTransaction(data, requestingUser) {
   });
 
   const manualRate = rates.find((r) => r.source === 'MANUAL');
-  const apiRate    = rates.find((r) => r.source === 'API');
+  const apiRate = rates.find((r) => r.source === 'API');
   const appliedRate = manualRate ?? apiRate;
   if (!appliedRate) throw Errors.NO_RATE_FOR_CORRIDOR();
 
@@ -160,15 +166,16 @@ export async function createTransaction(data, requestingUser) {
       sourceAmount,
       sourceCurrency: sourceZone.currency,
       destAmount,
-      destCurrency:   destZone.currency,
-      appliedRate:    appliedRate.rate,
-      rateSource:     appliedRate.source,
+      destCurrency: destZone.currency,
+      appliedRate: appliedRate.rate,
+      rateSource: appliedRate.source,
       sourceZoneId,
       destZoneId,
-      senderAgentId:  requestingUser.id,
-      recipientName:  recipientName.trim(),
-      status:         'PENDING',
-      expiresAt:      new Date(Date.now() + 48 * 60 * 60 * 1000), // 48h
+      senderAgentId: requestingUser.id,
+      senderName: senderName.trim(),
+      recipientName: recipientName.trim(),
+      status: 'PENDING',
+      expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000), // 48h
     },
     select: TRANSACTION_SELECT,
   });
@@ -190,7 +197,7 @@ export async function confirmTransaction(id, requestingUser) {
     });
     if (!existing) throw Errors.TRANSACTION_NOT_FOUND();
     if (existing.status === 'COMPLETED') throw Errors.ALREADY_CONFIRMED();
-    if (existing.status !== 'PENDING')   throw Errors.TRANSACTION_NOT_PENDING();
+    if (existing.status !== 'PENDING') throw Errors.TRANSACTION_NOT_PENDING();
 
     // Check agent is assigned to dest zone
     const userZone = await t.userZone.findUnique({
@@ -201,9 +208,9 @@ export async function confirmTransaction(id, requestingUser) {
     const confirmed = await t.transaction.update({
       where: { id },
       data: {
-        status:          'COMPLETED',
+        status: 'COMPLETED',
         receiverAgentId: requestingUser.id,
-        confirmedAt:     new Date(),
+        confirmedAt: new Date(),
       },
       select: TRANSACTION_SELECT,
     });
@@ -211,11 +218,11 @@ export async function confirmTransaction(id, requestingUser) {
     // Create notification for sender
     const notif = await t.notification.create({
       data: {
-        userId:  existing.senderAgentId,
-        type:    'TRANSACTION_CONFIRMED',
-        title:   'Transfert confirmé',
+        userId: existing.senderAgentId,
+        type: 'TRANSACTION_CONFIRMED',
+        title: 'Transfert confirmé',
         message: `${existing.code} — ${existing.destAmount / 100} ${existing.destCurrency} remis à ${existing.recipientName}`,
-        data:    { transactionId: id, code: existing.code },
+        data: { transactionId: id, code: existing.code },
       },
     });
 
@@ -250,7 +257,7 @@ export async function cancelTransaction(id, { cancelReason }, requestingUser) {
   const cancelled = await prisma.transaction.update({
     where: { id },
     data: {
-      status:      'CANCELLED',
+      status: 'CANCELLED',
       cancelledAt: new Date(),
       cancelReason: cancelReason?.trim(),
     },
@@ -264,10 +271,10 @@ export async function cancelTransaction(id, { cancelReason }, requestingUser) {
     const notif = await prisma.notification.create({
       data: {
         userId,
-        type:    'TRANSACTION_CANCELLED',
-        title:   'Transfert annulé',
+        type: 'TRANSACTION_CANCELLED',
+        title: 'Transfert annulé',
         message: `${existing.code} a été annulé${cancelReason ? ` : ${cancelReason}` : ''}`,
-        data:    { transactionId: id, code: existing.code },
+        data: { transactionId: id, code: existing.code },
       },
     });
     try {

@@ -10,9 +10,10 @@ const router = Router();
 router.use(authenticate);
 
 const createSchema = Joi.object({
-  sourceAmount:  Joi.number().integer().positive().max(100_000_00).required(),
-  sourceZoneId:  Joi.string().required(),
-  destZoneId:    Joi.string().required(),
+  sourceAmount: Joi.number().integer().positive().max(100_000_00).required(),
+  sourceZoneId: Joi.string().required(),
+  destZoneId: Joi.string().required(),
+  senderName: Joi.string().trim().min(2).max(100).required(),
   recipientName: Joi.string().trim().min(2).max(100).required(),
 });
 
@@ -21,19 +22,19 @@ const cancelSchema = Joi.object({
 });
 
 const listQuerySchema = Joi.object({
-  status:       Joi.string().valid('PENDING', 'COMPLETED', 'CANCELLED', 'EXPIRED'),
+  status: Joi.string().valid('PENDING', 'COMPLETED', 'CANCELLED', 'EXPIRED'),
   sourceZoneId: Joi.string(),
-  destZoneId:   Joi.string(),
-  agentId:      Joi.string(),
-  from:         Joi.date().iso(),
-  to:           Joi.date().iso(),
-  page:         Joi.number().integer().min(1).default(1),
-  limit:        Joi.number().integer().min(1).max(100).default(20),
+  destZoneId: Joi.string(),
+  agentId: Joi.string(),
+  from: Joi.date().iso(),
+  to: Joi.date().iso(),
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
 });
 
-router.get('/',              validateQuery(listQuerySchema), ctrl.list);
-router.get('/code/:code',    ctrl.getByCode);
-router.get('/:id',           ctrl.getById);
+router.get('/', validateQuery(listQuerySchema), ctrl.list);
+router.get('/code/:code', ctrl.getByCode);
+router.get('/:id', ctrl.getById);
 
 router.post('/',
   transactionLimiter,

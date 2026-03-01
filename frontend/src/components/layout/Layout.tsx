@@ -6,6 +6,7 @@ import { connectSocket, setQueryClientRef } from '@/socket/socketClient';
 import { Sidebar } from './Sidebar';
 import { BottomTabBar } from './BottomTabBar';
 import { Header } from './Header';
+import { MobileHeader } from './MobileHeader';
 import { ToastContainer } from '../ui/ToastContainer';
 
 export function Layout() {
@@ -33,13 +34,18 @@ export function Layout() {
 
       {/* Main content */}
       <div className="lg:pl-64 flex flex-col min-h-screen">
-        {/* Desktop Header */}
+        {/* Desktop header */}
         <div className="hidden lg:block sticky top-0 z-40">
           <Header />
         </div>
 
+        {/* Mobile header */}
+        <div className="lg:hidden sticky top-0 z-40">
+          <MobileHeader />
+        </div>
+
         {/* Page content */}
-        <main className="flex-1 p-4 lg:p-6 pb-20 lg:pb-6 max-w-7xl mx-auto w-full animate-fade-in">
+        <main className="flex-1 p-4 lg:p-6 pb-24 lg:pb-6 max-w-7xl mx-auto w-full animate-fade-in">
           <Outlet />
         </main>
       </div>

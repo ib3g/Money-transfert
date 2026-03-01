@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { QrCodeIcon, ShieldCheckIcon } from '@phosphor-icons/react';
 import { authApi } from '@/api/auth.api';
 import { useAuthStore } from '@/stores/authStore';
@@ -11,6 +11,8 @@ import { connectSocket } from '@/socket/socketClient';
 export default function Setup2FA() {
   const navigate = useNavigate();
   const { setUser, user } = useAuthStore();
+
+  if (import.meta.env.DEV) return <Navigate to="/dashboard" replace />;
   const [qrCode, setQrCode] = useState('');
   const [secret, setSecret] = useState('');
   const [code, setCode] = useState('');

@@ -87,6 +87,7 @@ export interface Transaction {
   destZoneId: string;
   senderAgentId: string;
   receiverAgentId?: string;
+  senderName: string;
   recipientName: string;
   status: TransactionStatus;
   expiresAt?: string;
@@ -152,6 +153,7 @@ export interface CreateTransactionDto {
   sourceAmount: number;
   sourceZoneId: string;
   destZoneId: string;
+  senderName: string;
   recipientName: string;
 }
 

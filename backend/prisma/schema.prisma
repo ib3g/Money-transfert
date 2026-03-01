@@ -148,6 +148,7 @@ model Transaction {
   destZoneId      String
   senderAgentId   String
   receiverAgentId String?
+  senderName      String
   recipientName   String
   status          TransactionStatus @default(PENDING)
   expiresAt       DateTime?

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowsLeftRightIcon, PlusIcon, FunnelSimpleIcon, XIcon, MagnifyingGlassIcon,
-  CaretLeftIcon, CaretRightIcon, ArrowRightIcon, ClockIcon, CheckIcon, TrashIcon
+  CaretLeftIcon, CaretRightIcon, ArrowRightIcon, ClockIcon, CheckIcon, TrashIcon,
+  GlobeIcon
 } from '@phosphor-icons/react';
 import { useTransactions, useCancelTransaction } from '@/hooks/useTransactions';
 import { useZones } from '@/hooks/useZones';
@@ -107,7 +108,13 @@ function TxCard({
       <div className="flex items-start justify-between gap-2 mb-3">
         <div>
           <p className="font-mono text-sm font-bold text-brand tracking-wider">{tx.code}</p>
-          <p className="text-xs text-muted mt-0.5">{tx.recipientName}</p>
+          <div className="flex flex-col gap-0.5 mt-2">
+            <span className="text-xs font-bold text-navy leading-none">{tx.senderName}</span>
+            <div className="flex items-center gap-1.5 text-[10px] text-muted">
+              <ArrowRightIcon size={10} />
+              <span>{tx.recipientName}</span>
+            </div>
+          </div>
         </div>
         <StatusBadge status={tx.status} />
       </div>
@@ -118,16 +125,17 @@ function TxCard({
         <span className="font-tabular font-semibold text-navy">{formatAmount(tx.destAmount, tx.destCurrency)}</span>
       </div>
 
-      <div className="flex items-center gap-3 text-xs text-muted mb-3">
-        <span>{tx.sourceZone?.name ?? '—'} → {tx.destZone?.name ?? '—'}</span>
+      <div className="flex items-center gap-3 text-[10px] text-muted-light mb-4">
+        <div className="flex items-center gap-1">
+          <GlobeIcon size={12} />
+          <span>{tx.sourceZone?.name ?? '—'} → {tx.destZone?.name ?? '—'}</span>
+        </div>
         {isPending && tx.expiresAt && (
           <span className="flex items-center gap-1 text-warning font-medium">
             <ClockIcon size={11} /> {timeLeft(tx.expiresAt)}
           </span>
         )}
       </div>
-
-      <p className="text-xs text-muted mb-3">{formatDate(tx.createdAt)}</p>
 
       {isPending && (
         <div className="flex gap-2">
@@ -324,7 +332,7 @@ export default function Transactions() {
               <thead>
                 <tr className="bg-surface border-b border-slate-100">
                   <th className="text-left px-6 py-3.5 text-xs font-semibold text-muted uppercase tracking-wider">Code</th>
-                  <th className="text-left px-6 py-3.5 text-xs font-semibold text-muted uppercase tracking-wider hidden xl:table-cell">Bénéficiaire</th>
+                  <th className="text-left px-6 py-3.5 text-xs font-semibold text-muted uppercase tracking-wider hidden xl:table-cell">Clients</th>
                   <th className="text-left px-6 py-3.5 text-xs font-semibold text-muted uppercase tracking-wider">Montant</th>
                   <th className="text-left px-6 py-3.5 text-xs font-semibold text-muted uppercase tracking-wider">Corridor</th>
                   <th className="text-left px-6 py-3.5 text-xs font-semibold text-muted uppercase tracking-wider">Statut</th>
@@ -343,8 +351,11 @@ export default function Transactions() {
                       </td>
                       <td className="px-6 py-4 hidden xl:table-cell">
                         <div className="flex flex-col">
-                          <span className="text-sm font-medium text-navy">{tx.recipientName}</span>
-                          <span className="text-[10px] text-muted">Bénéficiaire</span>
+                          <span className="text-sm font-medium text-navy">{tx.senderName}</span>
+                          <div className="flex items-center gap-1 text-[10px] text-muted">
+                            <ArrowRightIcon size={10} className="opacity-50" />
+                            <span>{tx.recipientName}</span>
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">

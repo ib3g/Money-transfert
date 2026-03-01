@@ -9,8 +9,8 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Force TOTP setup if not done
-  if (user && !user.totpEnabled && location.pathname !== '/setup-2fa') {
+  // Force TOTP setup if not done (skipped in dev)
+  if (!import.meta.env.DEV && user && !user.totpEnabled && location.pathname !== '/setup-2fa') {
     return <Navigate to="/setup-2fa" replace />;
   }
 
