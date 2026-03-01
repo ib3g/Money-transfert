@@ -20,3 +20,7 @@ node_modules/
 
 # Docker data
 pgdata/
+
+
+# Docs
+docs/
