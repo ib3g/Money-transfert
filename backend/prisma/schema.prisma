@@ -7,6 +7,158 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id                   String         @id @default(cuid())
+  email                String         @unique
+  password             String
+  firstName            String
+  lastName             String
+  role                 Role
+  isActive             Boolean        @default(true)
+  permissions          Permission[]   @default([])
+  totpSecret           String?
+  totpEnabled          Boolean        @default(false)
+  lastActivityAt       DateTime?
+  currentSessionId     String?
+  createdById          String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  auditLogs            AuditLog[]
+  notifications        Notification[]
+  refreshTokens        RefreshToken[]
+  receivedTransactions Transaction[]  @relation("ReceiverAgent")
+  sentTransactions     Transaction[]  @relation("SenderAgent")
+  createdBy            User?          @relation("CreatedUsers", fields: [createdById], references: [id])
+  createdUsers         User[]         @relation("CreatedUsers")
+  zones                UserZone[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model Zone {
+  id                 String         @id @default(cuid())
+  name               String         @unique
+  currency           String
+  isActive           Boolean        @default(true)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  destRates          ExchangeRate[] @relation("DestRateZone")
+  sourceRates        ExchangeRate[] @relation("SourceRateZone")
+  destTransactions   Transaction[]  @relation("DestZone")
+  sourceTransactions Transaction[]  @relation("SourceZone")
+  users              UserZone[]
+}
+
+model UserZone {
+  id     String @id @default(cuid())
+  userId String
+  zoneId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  zone   Zone   @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, zoneId])
+  @@index([userId])
+  @@index([zoneId])
+}
+
+model ExchangeRate {
+  id           String     @id @default(cuid())
+  sourceZoneId String
+  destZoneId   String
+  rate         Decimal    @db.Decimal(18, 6)
+  source       RateSource
+  isActive     Boolean    @default(true)
+  setById      String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  destZone     Zone       @relation("DestRateZone", fields: [destZoneId], references: [id])
+  sourceZone   Zone       @relation("SourceRateZone", fields: [sourceZoneId], references: [id])
+
+  @@index([sourceZoneId, destZoneId])
+  @@index([isActive])
+}
+
+model Transaction {
+  id              String            @id @default(cuid())
+  code            String            @unique
+  sourceAmount    Int
+  sourceCurrency  String
+  destAmount      Int
+  destCurrency    String
+  appliedRate     Decimal           @db.Decimal(18, 6)
+  rateSource      RateSource
+  sourceZoneId    String
+  destZoneId      String
+  senderAgentId   String
+  receiverAgentId String?
+  recipientName   String
+  status          TransactionStatus @default(PENDING)
+  expiresAt       DateTime?
+  confirmedAt     DateTime?
+  cancelledAt     DateTime?
+  cancelReason    String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  senderName      String
+  destZone        Zone              @relation("DestZone", fields: [destZoneId], references: [id])
+  receiverAgent   User?             @relation("ReceiverAgent", fields: [receiverAgentId], references: [id])
+  senderAgent     User              @relation("SenderAgent", fields: [senderAgentId], references: [id])
+  sourceZone      Zone              @relation("SourceZone", fields: [sourceZoneId], references: [id])
+
+  @@index([code])
+  @@index([status])
+  @@index([senderAgentId])
+  @@index([receiverAgentId])
+  @@index([sourceZoneId])
+  @@index([destZoneId])
+  @@index([createdAt])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  data      Json?
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  entity    String
+  entityId  String
+  details   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
 enum Role {
   OWNER
   MANAGER
@@ -42,165 +194,5 @@ enum NotificationType {
   TRANSACTION_EXPIRED
   RATE_UPDATED
   USER_CREATED
-}
-
-model User {
-  id               String       @id @default(cuid())
-  email            String       @unique
-  password         String
-  firstName        String
-  lastName         String
-  role             Role
-  isActive         Boolean      @default(true)
-  permissions      Permission[] @default([])
-  totpSecret       String?
-  totpEnabled      Boolean      @default(false)
-  lastActivityAt   DateTime?
-  currentSessionId String?
-
-  zones                UserZone[]
-  refreshTokens        RefreshToken[]
-  sentTransactions     Transaction[]  @relation("SenderAgent")
-  receivedTransactions Transaction[]  @relation("ReceiverAgent")
-  notifications        Notification[]
-  auditLogs            AuditLog[]
-
-  createdById  String?
-  createdBy    User?   @relation("CreatedUsers", fields: [createdById], references: [id])
-  createdUsers User[]  @relation("CreatedUsers")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([email])
-  @@index([role])
-}
-
-model RefreshToken {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([token])
-}
-
-model Zone {
-  id       String  @id @default(cuid())
-  name     String  @unique
-  currency String
-  isActive Boolean @default(true)
-
-  users              UserZone[]
-  sourceTransactions Transaction[]  @relation("SourceZone")
-  destTransactions   Transaction[]  @relation("DestZone")
-  sourceRates        ExchangeRate[] @relation("SourceRateZone")
-  destRates          ExchangeRate[] @relation("DestRateZone")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model UserZone {
-  id     String @id @default(cuid())
-  userId String
-  zoneId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  zone   Zone   @relation(fields: [zoneId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, zoneId])
-  @@index([userId])
-  @@index([zoneId])
-}
-
-model ExchangeRate {
-  id           String     @id @default(cuid())
-  sourceZoneId String
-  destZoneId   String
-  rate         Decimal    @db.Decimal(18, 6)
-  source       RateSource
-  isActive     Boolean    @default(true)
-  setById      String?
-
-  sourceZone Zone @relation("SourceRateZone", fields: [sourceZoneId], references: [id])
-  destZone   Zone @relation("DestRateZone",   fields: [destZoneId],   references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([sourceZoneId, destZoneId])
-  @@index([isActive])
-}
-
-model Transaction {
-  id              String            @id @default(cuid())
-  code            String            @unique
-  sourceAmount    Int
-  sourceCurrency  String
-  destAmount      Int
-  destCurrency    String
-  appliedRate     Decimal           @db.Decimal(18, 6)
-  rateSource      RateSource
-  sourceZoneId    String
-  destZoneId      String
-  senderAgentId   String
-  receiverAgentId String?
-  senderName      String
-  recipientName   String
-  status          TransactionStatus @default(PENDING)
-  expiresAt       DateTime?
-  confirmedAt     DateTime?
-  cancelledAt     DateTime?
-  cancelReason    String?
-
-  sourceZone    Zone  @relation("SourceZone",    fields: [sourceZoneId],  references: [id])
-  destZone      Zone  @relation("DestZone",      fields: [destZoneId],    references: [id])
-  senderAgent   User  @relation("SenderAgent",   fields: [senderAgentId], references: [id])
-  receiverAgent User? @relation("ReceiverAgent", fields: [receiverAgentId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([code])
-  @@index([status])
-  @@index([senderAgentId])
-  @@index([receiverAgentId])
-  @@index([sourceZoneId])
-  @@index([destZoneId])
-  @@index([createdAt])
-}
-
-model Notification {
-  id        String           @id @default(cuid())
-  userId    String
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      NotificationType
-  title     String
-  message   String
-  data      Json?
-  isRead    Boolean          @default(false)
-  readAt    DateTime?
-  createdAt DateTime         @default(now())
-
-  @@index([userId, isRead])
-  @@index([createdAt])
-}
-
-model AuditLog {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  action    String
-  entity    String
-  entityId  String
-  details   Json?
-  ipAddress String?
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([entity, entityId])
-  @@index([createdAt])
+  TRANSACTION_CREATED
 }

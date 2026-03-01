@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/Input';
 import { BlankSlate } from '@/components/ui/BlankSlate';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Link } from 'react-router-dom';
+import { CURRENCIES } from '@/constants/currencies';
 import type { Zone } from '@/types';
 
 // Badge shown on zones that have no initialized API rates (config incomplete)
@@ -49,34 +50,96 @@ function Modal({
   );
 }
 
-// ── Currency options ───────────────────────────────────────────────────────
-const CURRENCY_OPTIONS = [
-  { code: 'EUR', label: 'Euro (EUR)' },
-  { code: 'USD', label: 'US Dollar (USD)' },
-  { code: 'XOF', label: 'Franc CFA BCEAO (XOF)' },
-  { code: 'XAF', label: 'Franc CFA BEAC (XAF)' },
-  { code: 'GBP', label: 'Livre Sterling (GBP)' },
-  { code: 'CAD', label: 'Dollar Canadien (CAD)' },
-  { code: 'MAD', label: 'Dirham Marocain (MAD)' },
-  { code: 'DZD', label: 'Dinar Algérien (DZD)' },
-  { code: 'TND', label: 'Dinar Tunisien (TND)' },
-  { code: 'NGN', label: 'Naira Nigérian (NGN)' },
-  { code: 'GHS', label: 'Cedi Ghanéen (GHS)' },
-  { code: 'SEN', label: 'Sénégal (XOF)' },
-];
+// ── Custom Currency Select ───────────────────────────────────────────────────
+function CurrencySelect({
+  value,
+  onChange,
+  onNameSuggest,
+  availableCurrencies,
+  disabled
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  onNameSuggest: (name: string) => void;
+  availableCurrencies: typeof CURRENCIES;
+  disabled?: boolean;
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+
+  // Sync internal search state with external value
+  useState(() => {
+    if (value) {
+      const matched = availableCurrencies.find(c => c.code === value) || CURRENCIES.find(c => c.code === value);
+      if (matched) setQuery(matched.label);
+    }
+  });
+
+  const filtered = availableCurrencies.filter(c =>
+    c.label.toLowerCase().includes(query.toLowerCase()) ||
+    c.code.toLowerCase().includes(query.toLowerCase())
+  );
+
+  return (
+    <div className="relative">
+      <label className="block text-sm font-medium text-slate-700 mb-1.5">Rechercher une devise ou un pays</label>
+      <input
+        type="text"
+        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-navy focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+        placeholder="ex: Euro, EUR, France..."
+        value={query}
+        disabled={disabled}
+        onChange={e => {
+          setQuery(e.target.value);
+          setOpen(true);
+          onChange(''); // Reset actual selected value while typing
+        }}
+        onFocus={() => {
+          if (!disabled) setOpen(true);
+        }}
+        onBlur={() => setTimeout(() => setOpen(false), 200)}
+        required={!value}
+      />
+      {open && filtered.length > 0 && (
+        <ul className="absolute z-10 w-full mt-1 max-h-60 overflow-auto bg-white border border-slate-200 rounded-xl shadow-lg">
+          {filtered.map(c => (
+            <li
+              key={c.code}
+              className="px-3 py-2 text-sm text-navy cursor-pointer hover:bg-slate-50 border-b border-slate-50 last:border-0"
+              onMouseDown={(e) => {
+                e.preventDefault(); // Prevent input from losing focus immediately
+                onChange(c.code);
+                setQuery(c.label);
+                setOpen(false);
+                onNameSuggest(c.country);
+              }}
+            >
+              {c.label}
+            </li>
+          ))}
+        </ul>
+      )}
+      {open && query && filtered.length === 0 && (
+        <div className="absolute z-10 w-full mt-1 p-3 text-sm text-slate-500 bg-white border border-slate-200 rounded-xl shadow-lg">
+          Aucune devise trouvée.
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Create / Edit modal ────────────────────────────────────────────────────
 function ZoneFormModal({
-  zone, onClose,
-}: { zone?: Zone | null; onClose: () => void }) {
+  zone, existingZones, onClose,
+}: { zone?: Zone | null; existingZones: Zone[]; onClose: () => void }) {
   const isEdit = !!zone;
   const [name, setName] = useState(zone?.name ?? '');
   const [currency, setCurrency] = useState(zone?.currency ?? '');
   const [customCurrency, setCustomCurrency] = useState(
-    zone?.currency && !CURRENCY_OPTIONS.find(c => c.code === zone.currency) ? zone.currency : '',
+    zone?.currency && !CURRENCIES.find(c => c.code === zone.currency) ? zone.currency : '',
   );
   const [useCustom, setUseCustom] = useState(
-    !!zone?.currency && !CURRENCY_OPTIONS.find(c => c.code === zone.currency),
+    !!zone?.currency && !CURRENCIES.find(c => c.code === zone.currency),
   );
 
   const create = useCreateZone();
@@ -84,6 +147,9 @@ function ZoneFormModal({
   const isPending = create.isPending || update.isPending;
 
   const resolvedCurrency = useCustom ? customCurrency.toUpperCase() : currency;
+  const availableCurrencies = CURRENCIES.filter(
+    c => existingZones.every(z => !z.isActive || z.currency !== c.code || z.id === zone?.id)
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,30 +171,14 @@ function ZoneFormModal({
   return (
     <Modal title={isEdit ? 'Modifier la zone' : 'Nouvelle zone'} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
-          label="Nom de la zone"
-          placeholder="ex: France, Sénégal, Canada…"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          required
-          autoFocus
-        />
-
         {!useCustom ? (
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Devise</label>
-            <select
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-navy focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-colors"
-              value={currency}
-              onChange={e => setCurrency(e.target.value)}
-              required={!useCustom}
-            >
-              <option value="">Sélectionner une devise…</option>
-              {CURRENCY_OPTIONS.map(c => (
-                <option key={c.code} value={c.code}>{c.label}</option>
-              ))}
-            </select>
-          </div>
+          <CurrencySelect
+            value={currency}
+            onChange={setCurrency}
+            disabled={isEdit}
+            availableCurrencies={availableCurrencies}
+            onNameSuggest={(suggestedName) => setName(suggestedName)}
+          />
         ) : (
           <Input
             label="Code devise personnalisé"
@@ -136,23 +186,34 @@ function ZoneFormModal({
             value={customCurrency}
             onChange={e => setCustomCurrency(e.target.value.toUpperCase())}
             maxLength={5}
+            disabled={isEdit}
             required={useCustom}
           />
         )}
 
-        <button
-          type="button"
-          onClick={() => { setUseCustom(v => !v); setCurrency(''); setCustomCurrency(''); }}
-          className="text-xs text-brand hover:underline"
-        >
-          {useCustom ? '← Sélectionner depuis la liste' : 'Saisir un code personnalisé →'}
-        </button>
+        <Input
+          label="Nom de la zone (Pays / Région)"
+          placeholder="ex: France, Sénégal, Canada…"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          required
+        />
+
+        {!isEdit && (
+          <button
+            type="button"
+            onClick={() => { setUseCustom(v => !v); setCurrency(''); setCustomCurrency(''); }}
+            className="text-xs text-brand hover:underline"
+          >
+            {useCustom ? '← Sélectionner depuis la liste' : 'Saisir un code personnalisé →'}
+          </button>
+        )}
 
         <div className="flex gap-3 pt-2">
           <Button type="button" variant="ghost" className="flex-1" onClick={onClose}>
             Annuler
           </Button>
-          <Button type="submit" className="flex-1" loading={isPending}>
+          <Button type="submit" className="flex-1" loading={isPending} disabled={!resolvedCurrency || !name}>
             {isEdit ? 'Enregistrer' : 'Créer la zone'}
           </Button>
         </div>
@@ -354,7 +415,7 @@ export default function Zones() {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {zones.map(zone => (
-                <tr key={zone.id} className="hover:bg-surface/50 transition-colors">
+                <tr key={zone.id} className={`hover:bg-surface/50 transition-colors ${!zone.isActive ? 'opacity-50 bg-slate-50/50 grayscale-[20%]' : ''}`}>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${zone.isActive ? 'bg-brand/10' : 'bg-slate-100'}`}>
@@ -418,8 +479,8 @@ export default function Zones() {
       )}
 
       {/* Modals */}
-      {showCreate && <ZoneFormModal onClose={() => setShowCreate(false)} />}
-      {editZone && <ZoneFormModal zone={editZone} onClose={() => setEditZone(null)} />}
+      {showCreate && <ZoneFormModal existingZones={zones ?? []} onClose={() => setShowCreate(false)} />}
+      {editZone && <ZoneFormModal zone={editZone} existingZones={zones ?? []} onClose={() => setEditZone(null)} />}
       {deleteZone && <DeleteModal zone={deleteZone} onClose={() => setDeleteZone(null)} />}
     </div>
   );

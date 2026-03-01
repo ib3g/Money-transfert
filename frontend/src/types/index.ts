@@ -13,6 +13,7 @@ export type Permission =
 export type TransactionStatus = 'PENDING' | 'COMPLETED' | 'CANCELLED' | 'EXPIRED';
 export type RateSource = 'MANUAL' | 'API';
 export type NotificationType =
+  | 'TRANSACTION_CREATED'
   | 'TRANSACTION_CONFIRMED'
   | 'TRANSACTION_CANCELLED'
   | 'TRANSACTION_EXPIRED'

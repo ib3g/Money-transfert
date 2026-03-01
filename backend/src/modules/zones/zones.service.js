@@ -17,11 +17,15 @@ const ZONE_SELECT = {
   },
 };
 
-export async function listZones() {
-  // All authenticated users can see the list of active zones
-  // This is needed for rate simulation and choosing destinations
+import { hasPermission } from '../../middlewares/permissions.js';
+
+export async function listZones(requestingUser) {
+  // Users with MANAGE_ZONES permission or OWNER role can see all zones (including inactive to reactivate them)
+  // Others only see active zones
+  const canManageZones = hasPermission(requestingUser, 'MANAGE_ZONES');
+
   return prisma.zone.findMany({
-    where: { isActive: true },
+    where: canManageZones ? {} : { isActive: true },
     select: ZONE_SELECT,
     orderBy: { name: 'asc' },
   });
@@ -80,6 +84,16 @@ export async function updateZone(id, data, requestingUser) {
     select: ZONE_SELECT,
   });
 
+  if (data.isActive === true && zone.isActive === false) {
+    // Zone is being reactivated, we need to refresh rates
+    try {
+      await refreshRatesForZone({ id: updated.id, currency: updated.currency });
+      try { getIO().emit('rate:updated', { reason: 'zone_reactivated', zoneId: id }); } catch { /* not ready */ }
+    } catch (err) {
+      console.error('[ZONE_REACTIVATION]', err.message);
+    }
+  }
+
   logAudit(requestingUser.id, 'ZONE_UPDATED', 'Zone', id, data, null);
   return updated;
 }
@@ -88,12 +102,37 @@ export async function deleteZone(id, requestingUser) {
   const zone = await prisma.zone.findUnique({
     where: { id },
     include: {
-      _count: { select: { sourceTransactions: { where: { status: 'PENDING' } } } },
+      _count: { select: { sourceTransactions: true, destTransactions: true } },
     },
   });
   if (!zone) throw Errors.ZONE_NOT_FOUND();
 
-  if (zone._count.sourceTransactions > 0) {
+  const totalTransactions = zone._count.sourceTransactions + zone._count.destTransactions;
+
+  if (totalTransactions === 0) {
+    // No history at all = HARD DELETE
+    await prisma.exchangeRate.deleteMany({
+      where: { OR: [{ sourceZoneId: id }, { destZoneId: id }] },
+    });
+    await prisma.userZone.deleteMany({
+      where: { zoneId: id },
+    });
+    await prisma.zone.delete({
+      where: { id },
+    });
+    logAudit(requestingUser.id, 'ZONE_DELETED', 'Zone', id, null, null);
+    return { id, deleted: true };
+  }
+
+  // Has history = SOFT DELETE (Deactivation)
+  const pendingTxs = await prisma.transaction.count({
+    where: {
+      OR: [{ sourceZoneId: id }, { destZoneId: id }],
+      status: 'PENDING',
+    },
+  });
+
+  if (pendingTxs > 0) {
     throw new Error('Impossible de désactiver une zone avec des transactions en cours');
   }
 

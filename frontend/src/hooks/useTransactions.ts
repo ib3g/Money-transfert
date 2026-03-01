@@ -7,7 +7,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
   return useQuery({
     queryKey: ['transactions', filters],
     queryFn: () => transactionsApi.list(filters),
-    staleTime: 30_000,
+    staleTime: 15_000, // Sockets handle real-time updates via invalidateQueries
   });
 }
 
@@ -16,6 +16,7 @@ export function useTransaction(id: string) {
     queryKey: ['transactions', id],
     queryFn: () => transactionsApi.byId(id),
     enabled: !!id,
+    staleTime: 15_000,
   });
 }
 
@@ -25,6 +26,7 @@ export function useTransactionByCode(code: string) {
     queryFn: () => transactionsApi.byCode(code),
     enabled: !!code && code.length >= 11, // TR-XXXXXXXX
     retry: 1,
+    staleTime: 0, // Critical: confirm page must always show the real current status
   });
 }
 

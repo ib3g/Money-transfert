@@ -1,13 +1,13 @@
 import { prisma } from '../config/database.js';
 import { env } from '../config/env.js';
 
-export async function fetchRateFromAPI(fromCurrency, toCurrency) {
-  const url = `${env.exchangeRate.baseUrl}/${env.exchangeRate.apiKey}/pair/${fromCurrency}/${toCurrency}`;
+export async function fetchAllRatesFromAPI(baseCurrency) {
+  const url = `${env.exchangeRate.baseUrl}/${env.exchangeRate.apiKey}/latest/${baseCurrency}`;
   const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
   if (!res.ok) throw new Error(`ExchangeRate API error: ${res.status}`);
   const data = await res.json();
   if (data.result !== 'success') throw new Error(`API error: ${data['error-type']}`);
-  return data.conversion_rate;
+  return data.conversion_rates;
 }
 
 // Initialize rates for a newly created zone vs. all existing zones
@@ -19,36 +19,48 @@ export async function refreshRatesForZone(newZone) {
   let updated = 0;
   let errors = 0;
 
-  for (const other of otherZones) {
-    // newZone → other
-    try {
-      const rate = await fetchRateFromAPI(newZone.currency, other.currency);
-      await prisma.exchangeRate.updateMany({
-        where: { sourceZoneId: newZone.id, destZoneId: other.id, source: 'API', isActive: true },
-        data: { isActive: false },
-      });
-      await prisma.exchangeRate.create({
-        data: { sourceZoneId: newZone.id, destZoneId: other.id, rate, source: 'API', isActive: true },
-      });
-      updated++;
-    } catch (err) {
-      console.error(`[ZONE_INIT] ${newZone.currency}→${other.currency}: ${err.message}`);
-      errors++;
+  // newZone -> others
+  try {
+    const rates = await fetchAllRatesFromAPI(newZone.currency);
+    for (const other of otherZones) {
+      const rate = rates[other.currency];
+      if (rate) {
+        await prisma.exchangeRate.updateMany({
+          where: { sourceZoneId: newZone.id, destZoneId: other.id, source: 'API', isActive: true },
+          data: { isActive: false },
+        });
+        await prisma.exchangeRate.create({
+          data: { sourceZoneId: newZone.id, destZoneId: other.id, rate, source: 'API', isActive: true },
+        });
+        updated++;
+      } else {
+        errors++;
+      }
     }
+  } catch (err) {
+    console.error(`[ZONE_INIT] ${newZone.currency} rates: ${err.message}`);
+    errors += otherZones.length;
+  }
 
-    // other → newZone
+  // others -> newZone
+  for (const other of otherZones) {
     try {
-      const rate = await fetchRateFromAPI(other.currency, newZone.currency);
-      await prisma.exchangeRate.updateMany({
-        where: { sourceZoneId: other.id, destZoneId: newZone.id, source: 'API', isActive: true },
-        data: { isActive: false },
-      });
-      await prisma.exchangeRate.create({
-        data: { sourceZoneId: other.id, destZoneId: newZone.id, rate, source: 'API', isActive: true },
-      });
-      updated++;
+      const rates = await fetchAllRatesFromAPI(other.currency);
+      const rate = rates[newZone.currency];
+      if (rate) {
+        await prisma.exchangeRate.updateMany({
+          where: { sourceZoneId: other.id, destZoneId: newZone.id, source: 'API', isActive: true },
+          data: { isActive: false },
+        });
+        await prisma.exchangeRate.create({
+          data: { sourceZoneId: other.id, destZoneId: newZone.id, rate, source: 'API', isActive: true },
+        });
+        updated++;
+      } else {
+        errors++;
+      }
     } catch (err) {
-      console.error(`[ZONE_INIT] ${other.currency}→${newZone.currency}: ${err.message}`);
+      console.error(`[ZONE_INIT] ${other.currency} rates: ${err.message}`);
       errors++;
     }
   }
@@ -63,41 +75,44 @@ export async function refreshAllRates() {
   let updated = 0;
   let errors = 0;
 
-  // For each pair of zones
   for (const src of zones) {
-    for (const dst of zones) {
-      if (src.id === dst.id) continue;
+    try {
+      const rates = await fetchAllRatesFromAPI(src.currency);
 
-      try {
-        const rate = await fetchRateFromAPI(src.currency, dst.currency);
+      for (const dst of zones) {
+        if (src.id === dst.id) continue;
+        const rate = rates[dst.currency];
 
-        // Deactivate old API rates for this corridor
-        await prisma.exchangeRate.updateMany({
-          where: {
-            sourceZoneId: src.id,
-            destZoneId: dst.id,
-            source: 'API',
-            isActive: true,
-          },
-          data: { isActive: false },
-        });
+        if (rate) {
+          // Deactivate old API rates for this corridor
+          await prisma.exchangeRate.updateMany({
+            where: {
+              sourceZoneId: src.id,
+              destZoneId: dst.id,
+              source: 'API',
+              isActive: true,
+            },
+            data: { isActive: false },
+          });
 
-        // Create new rate
-        await prisma.exchangeRate.create({
-          data: {
-            sourceZoneId: src.id,
-            destZoneId: dst.id,
-            rate,
-            source: 'API',
-            isActive: true,
-          },
-        });
-
-        updated++;
-      } catch (err) {
-        console.error(`[CRON] Rate ${src.currency}→${dst.currency}: ${err.message}`);
-        errors++;
+          // Create new rate
+          await prisma.exchangeRate.create({
+            data: {
+              sourceZoneId: src.id,
+              destZoneId: dst.id,
+              rate,
+              source: 'API',
+              isActive: true,
+            },
+          });
+          updated++;
+        } else {
+          errors++;
+        }
       }
+    } catch (err) {
+      console.error(`[CRON] Rates for ${src.currency}: ${err.message}`);
+      errors += zones.length - 1;
     }
   }
 

@@ -22,6 +22,7 @@ export const authenticate = async (req, res, next) => {
         id: true, email: true, firstName: true, lastName: true,
         role: true, permissions: true, isActive: true,
         currentSessionId: true, lastActivityAt: true,
+        zones: { include: { zone: true } },
       },
     });
 
@@ -44,7 +45,7 @@ export const authenticate = async (req, res, next) => {
     prisma.user.update({
       where: { id: user.id },
       data: { lastActivityAt: new Date() },
-    }).catch(() => {});
+    }).catch(() => { });
 
     req.user = user;
     next();

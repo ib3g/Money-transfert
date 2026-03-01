@@ -102,9 +102,13 @@ function TxCard({
 }) {
   const isSender = tx.senderAgentId === myId;
   const isPending = tx.status === 'PENDING';
+  const navigate = useNavigate();
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 animate-fade-in">
+    <div
+      onClick={() => navigate(`/transactions/confirm?code=${tx.code}`)}
+      className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 animate-fade-in cursor-pointer hover:bg-slate-50 active:scale-[0.99] transition-all"
+    >
       <div className="flex items-start justify-between gap-2 mb-3">
         <div>
           <p className="font-mono text-sm font-bold text-brand tracking-wider">{tx.code}</p>
@@ -141,7 +145,7 @@ function TxCard({
         <div className="flex gap-2">
           {!isSender && (
             <button
-              onClick={onConfirm}
+              onClick={(e) => { e.stopPropagation(); onConfirm(); }}
               className="flex-1 text-xs py-1.5 rounded-lg bg-success/10 text-success font-medium hover:bg-success/20 transition-colors"
             >
               Confirmer
@@ -149,7 +153,7 @@ function TxCard({
           )}
           {(isSender || canCancel) && (
             <button
-              onClick={onCancel}
+              onClick={(e) => { e.stopPropagation(); onCancel(); }}
               className="flex-1 text-xs py-1.5 rounded-lg bg-danger/5 text-danger font-medium hover:bg-danger/10 transition-colors"
             >
               Annuler

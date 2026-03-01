@@ -6,7 +6,7 @@ export function useRates() {
   return useQuery({
     queryKey: ['rates'],
     queryFn: ratesApi.list,
-    staleTime: 60_000,
+    staleTime: 30_000, // Rates don't change frequently; sockets handle real-time updates
   });
 }
 
@@ -59,6 +59,7 @@ export function useForceRefreshRates() {
     mutationFn: ratesApi.forceRefresh,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['rates'] });
+      qc.invalidateQueries({ queryKey: ['zones'] });
       toast.success('Taux actualisés', 'Les taux du marché ont été mis à jour.');
     },
     onError: (err: any) => toast.error('Erreur', err.message),

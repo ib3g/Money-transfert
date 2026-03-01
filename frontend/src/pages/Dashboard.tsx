@@ -48,7 +48,6 @@ export default function Dashboard() {
 
   const pendingFilters = {
     status: 'PENDING' as const,
-    ...(showStats ? {} : { agentId: user?.id }),
     limit: 8,
   };
   const { data: pendingData, isLoading: loadingPending } = useTransactions(pendingFilters);
@@ -443,7 +442,10 @@ function PendingRow({ tx, currentUserId }: { tx: Transaction; currentUserId?: st
   const canCancel = isSender;
 
   return (
-    <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-surface transition-colors group">
+    <div
+      onClick={() => navigate(`/transactions/confirm?code=${tx.code}`)}
+      className="flex items-center gap-3 p-3 rounded-xl hover:bg-surface transition-colors group cursor-pointer active:scale-[0.99]"
+    >
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
@@ -475,7 +477,10 @@ function PendingRow({ tx, currentUserId }: { tx: Transaction; currentUserId?: st
       <div className="flex-shrink-0 flex gap-2">
         {canConfirm && (
           <button
-            onClick={() => navigate(`/transactions/confirm?code=${tx.code}`)}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/transactions/confirm?code=${tx.code}`);
+            }}
             className="bg-gradient-brand text-white text-xs font-bold px-3 py-2 rounded-xl hover:opacity-90 transition-opacity shadow-brand whitespace-nowrap"
           >
             Confirmer
@@ -484,6 +489,7 @@ function PendingRow({ tx, currentUserId }: { tx: Transaction; currentUserId?: st
         {canCancel && (
           <Link
             to={`/transactions?code=${tx.code}`}
+            onClick={(e) => e.stopPropagation()}
             className="bg-danger/5 text-danger text-xs font-bold px-3 py-2 rounded-xl hover:bg-danger/10 transition-colors whitespace-nowrap"
           >
             Annuler

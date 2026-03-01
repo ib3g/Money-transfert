@@ -20,12 +20,12 @@ export function BottomTabBar() {
   useEffect(() => { setMoreOpen(false); }, [location.pathname]);
 
   const moreItems = [
-    { label: 'Mon profil',    to: '/profile',  icon: <UserCircleIcon   size={20} /> },
-    can('MANAGE_USERS')    && { label: 'Utilisateurs', to: '/users',    icon: <UsersIcon        size={20} /> },
-    can('MANAGE_ZONES')    && { label: 'Zones',         to: '/zones',   icon: <GlobeIcon        size={20} /> },
-    can('MANAGE_RATES')    && { label: 'Taux de change',to: '/rates',   icon: <ChartLineUpIcon  size={20} /> },
-    can('GENERATE_REPORTS')&& { label: 'Rapports',      to: '/reports', icon: <FilePdfIcon      size={20} /> },
-    can('VIEW_AUDIT_LOGS') && { label: 'Audit Logs',    to: '/audit',   icon: <ShieldCheckIcon  size={20} /> },
+    { label: 'Mon profil', to: '/profile', icon: <UserCircleIcon size={20} /> },
+    can('MANAGE_USERS') && { label: 'Utilisateurs', to: '/users', icon: <UsersIcon size={20} /> },
+    can('MANAGE_ZONES') && { label: 'Zones', to: '/zones', icon: <GlobeIcon size={20} /> },
+    can('MANAGE_RATES') && { label: 'Taux de change', to: '/rates', icon: <ChartLineUpIcon size={20} /> },
+    can('GENERATE_REPORTS') && { label: 'Rapports', to: '/reports', icon: <FilePdfIcon size={20} /> },
+    can('VIEW_AUDIT_LOGS') && { label: 'Audit Logs', to: '/audit', icon: <ShieldCheckIcon size={20} /> },
   ].filter(Boolean) as { label: string; to: string; icon: React.ReactNode }[];
 
   const moreIsActive = moreItems.some((i) => i.to === location.pathname);
@@ -82,30 +82,32 @@ export function BottomTabBar() {
         role="navigation"
         aria-label="Navigation principale"
       >
-        <div className="flex items-end justify-around h-16 px-2">
-          <TabItem to="/dashboard"    icon={<HouseIcon />}            label="Dashboard" />
-          <TabItem to="/transactions" icon={<ArrowsLeftRightIcon />}  label="Transferts" />
+        <div className="flex items-end h-16 px-2 w-full">
+          <TabItem to="/dashboard" icon={<HouseIcon />} label="Dashboard" />
+          <TabItem to="/transactions" icon={<ArrowsLeftRightIcon />} label="Transferts" />
 
           {/* CTA central */}
           {canCreate && (
-            <button
-              onClick={() => navigate('/transactions/new')}
-              className="flex flex-col items-center -mt-4"
-              aria-label="Nouveau transfert"
-            >
-              <div className="w-14 h-14 bg-gradient-brand rounded-2xl flex items-center justify-center shadow-brand">
-                <PlusCircleIcon size={28} weight="fill" className="text-white" />
-              </div>
-              <span className="text-[10px] text-muted-light mt-0.5 font-medium">Nouveau</span>
-            </button>
+            <div className="flex-1 flex justify-center pb-1">
+              <button
+                onClick={() => navigate('/transactions/new')}
+                className="flex flex-col items-center -mt-6"
+                aria-label="Nouveau transfert"
+              >
+                <div className="w-14 h-14 bg-gradient-brand rounded-2xl flex items-center justify-center shadow-brand">
+                  <PlusCircleIcon size={28} weight="fill" className="text-white" />
+                </div>
+                <span className="text-[10px] text-muted-light mt-1 font-medium">Nouveau</span>
+              </button>
+            </div>
           )}
 
           {/* Notifications */}
-          <div className="relative flex flex-col items-center">
+          <div className="flex-1 relative flex flex-col items-center justify-end pb-1.5">
             <NavLink
               to="/notifications"
               className={({ isActive }) =>
-                cn('flex flex-col items-center gap-0.5 px-3 py-2', isActive ? 'text-brand' : 'text-muted-light')
+                cn('flex flex-col items-center gap-0.5', isActive ? 'text-brand' : 'text-muted-light')
               }
               aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} non lues)` : ''}`}
             >
@@ -113,32 +115,34 @@ export function BottomTabBar() {
                 <>
                   {unreadCount > 0
                     ? <BellRingingIcon size={22} weight={isActive ? 'fill' : 'duotone'} />
-                    : <BellIcon        size={22} weight={isActive ? 'fill' : 'duotone'} />
+                    : <BellIcon size={22} weight={isActive ? 'fill' : 'duotone'} />
                   }
                   <span className="text-[10px] font-medium">Notifs</span>
                 </>
               )}
             </NavLink>
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 bg-danger text-white text-[9px] font-bold rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-0.5 pointer-events-none">
+              <span className="absolute top-0 right-1/4 bg-danger text-white text-[9px] font-bold rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-0.5 pointer-events-none">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
           </div>
 
           {/* More */}
-          <button
-            onClick={() => setMoreOpen((v) => !v)}
-            className={cn(
-              'flex flex-col items-center gap-0.5 px-3 py-2 transition-colors',
-              moreOpen || moreIsActive ? 'text-brand' : 'text-muted-light'
-            )}
-            aria-label="Plus de menus"
-            aria-expanded={moreOpen}
-          >
-            <DotsThreeIcon size={22} weight={moreOpen || moreIsActive ? 'fill' : 'regular'} />
-            <span className="text-[10px] font-medium">Plus</span>
-          </button>
+          <div className="flex-1 flex flex-col items-center justify-end pb-1.5">
+            <button
+              onClick={() => setMoreOpen((v) => !v)}
+              className={cn(
+                'flex flex-col items-center gap-0.5 transition-colors',
+                moreOpen || moreIsActive ? 'text-brand' : 'text-muted-light'
+              )}
+              aria-label="Plus de menus"
+              aria-expanded={moreOpen}
+            >
+              <DotsThreeIcon size={22} weight={moreOpen || moreIsActive ? 'fill' : 'regular'} />
+              <span className="text-[10px] font-medium">Plus</span>
+            </button>
+          </div>
         </div>
       </nav>
     </>
@@ -151,7 +155,7 @@ function TabItem({ to, icon, label }: { to: string; icon: React.ReactNode; label
       to={to}
       className={({ isActive }) =>
         cn(
-          'flex flex-col items-center gap-0.5 px-3 py-2 transition-colors',
+          'flex-1 flex flex-col items-center justify-end gap-0.5 pb-1.5 transition-colors',
           isActive ? 'text-brand' : 'text-muted-light'
         )
       }

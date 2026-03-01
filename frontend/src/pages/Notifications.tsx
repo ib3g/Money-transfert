@@ -13,8 +13,11 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import type { Notification, NotificationType } from '@/types';
 
-// ── Type display config ────────────────────────────────────────────────────
 const TYPE_CONFIG: Record<NotificationType, { icon: React.ReactNode; color: string }> = {
+  TRANSACTION_CREATED: {
+    icon: <BellIcon size={18} weight="fill" />,
+    color: 'text-brand bg-brand/10',
+  },
   TRANSACTION_CONFIRMED: {
     icon: <CheckCircleIcon size={18} weight="fill" />,
     color: 'text-success bg-success/10',
@@ -48,21 +51,53 @@ function timeAgo(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
 }
 
+// ── Notification data payload type ─────────────────────────────────────────
+interface NotifData {
+  transactionId?: string;
+  code?: string;
+  sourceZoneId?: string;
+  destZoneId?: string;
+  rate?: string;
+}
+
+/** Returns the navigation target URL for a notification, or null if not navigable. */
+function getNotifTarget(notif: Notification): string | null {
+  const data = (notif.data ?? {}) as NotifData;
+
+  switch (notif.type) {
+    case 'TRANSACTION_CREATED':
+    case 'TRANSACTION_CONFIRMED':
+    case 'TRANSACTION_CANCELLED':
+    case 'TRANSACTION_EXPIRED':
+      // Use the code for a direct lookup on the confirm/detail page
+      if (data.code) return `/transactions/confirm?code=${data.code}`;
+      return null;
+    case 'RATE_UPDATED':
+      return '/rates';
+    case 'USER_CREATED':
+      return '/users';
+    default:
+      return null;
+  }
+}
+
 // ── Notification item ──────────────────────────────────────────────────────
 function NotifItem({ notif, onMarkRead }: { notif: Notification; onMarkRead: (id: string) => void }) {
   const navigate = useNavigate();
   const config = TYPE_CONFIG[notif.type] ?? { icon: <BellIcon size={18} />, color: 'text-muted bg-slate-100' };
-  const txCode = (notif.data as any)?.transactionCode as string | undefined;
+  const data = (notif.data ?? {}) as NotifData;
+  const target = getNotifTarget(notif);
 
   const handleClick = () => {
     if (!notif.isRead) onMarkRead(notif.id);
-    if (txCode) navigate(`/transactions/confirm?code=${txCode}`);
+    if (target) navigate(target);
   };
 
   return (
     <div
-      onClick={handleClick}
-      className={`flex items-start gap-4 px-4 py-4 transition-all ${txCode ? 'cursor-pointer hover:bg-slate-50' : ''
+      onClick={target ? handleClick : undefined}
+      role={target ? 'button' : undefined}
+      className={`flex items-start gap-4 px-4 py-4 transition-all group ${target ? 'cursor-pointer hover:bg-surface active:bg-slate-100' : ''
         } ${!notif.isRead ? 'bg-brand/[0.02]' : ''}`}
     >
       <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${config.color}`}>
@@ -76,9 +111,16 @@ function NotifItem({ notif, onMarkRead }: { notif: Notification; onMarkRead: (id
           <span className="text-xs text-muted shrink-0">{timeAgo(notif.createdAt)}</span>
         </div>
         <p className="text-xs text-muted mt-0.5 line-clamp-2">{notif.message}</p>
-        {txCode && (
+        {/* Show transaction code badge for transaction-related notifs */}
+        {data.code && (
           <span className="inline-flex items-center gap-1 mt-1.5 text-xs text-brand font-mono font-semibold">
-            <ArrowsLeftRightIcon size={11} /> {txCode}
+            <ArrowsLeftRightIcon size={11} /> {data.code}
+          </span>
+        )}
+        {/* Show a subtle "Voir →" hint when the notif is navigable */}
+        {target && (
+          <span className="inline-block mt-1.5 text-[10px] font-medium text-brand/60 group-hover:text-brand transition-colors">
+            Voir →
           </span>
         )}
       </div>

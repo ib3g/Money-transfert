@@ -2,7 +2,7 @@ import { prisma } from '../../config/database.js';
 import { Errors } from '../../utils/errors.js';
 import { logAudit } from '../../middlewares/auditLog.js';
 import { generateUniqueCode } from './codeGenerator.js';
-import { emitToUser } from '../../socket.js';
+import { emitToUser, emitToZone } from '../../socket.js';
 import { hasPermission } from '../../middlewares/permissions.js';
 
 const TRANSACTION_SELECT = {
@@ -41,12 +41,13 @@ function buildVisibilityFilter(user) {
     };
   }
 
-  // Agent: their own transactions OR transactions in their zones
+  // Agent: their own transactions OR transactions in their zones (both directions)
   const zoneIds = user.zones?.map((uz) => uz.zoneId) ?? [];
   return {
     OR: [
       { senderAgentId: user.id },
       { receiverAgentId: user.id },
+      { sourceZoneId: { in: zoneIds } },
       { destZoneId: { in: zoneIds } },
     ],
   };
@@ -180,6 +181,42 @@ export async function createTransaction(data, requestingUser) {
     select: TRANSACTION_SELECT,
   });
 
+  // Find users assigned to dest zone to notify them
+  const destUsers = await prisma.userZone.findMany({
+    where: { zoneId: destZoneId },
+    select: { userId: true },
+  });
+
+  const destUserIds = [...new Set(destUsers.map(u => u.userId))];
+
+  // Create notifications in DB
+  if (destUserIds.length > 0) {
+    const notifications = await Promise.all(
+      destUserIds.map((userId) =>
+        prisma.notification.create({
+          data: {
+            userId,
+            type: 'TRANSACTION_CREATED',
+            title: 'Nouveau transfert à payer',
+            message: `${code} — ${destAmount} ${destZone.currency} pour ${recipientName.trim()} de la part de ${senderName.trim()}`,
+            data: { transactionId: tx.id, code },
+          },
+        })
+      )
+    );
+
+    // Emit real-time notifications via socket
+    try {
+      notifications.forEach((notif) => {
+        emitToUser(notif.userId, 'notification', notif);
+      });
+      // Also broadcast the new transaction to the source and dest zones
+      // to trigger a list refresh even if notification wasn't sent to a specific user
+      emitToZone(sourceZoneId, 'transaction:created', { id: tx.id, status: 'PENDING' });
+      emitToZone(destZoneId, 'transaction:created', { id: tx.id, status: 'PENDING' });
+    } catch { /* non-blocking */ }
+  }
+
   logAudit(requestingUser.id, 'TRANSACTION_CREATED', 'Transaction', tx.id, {
     code, sourceAmount, destAmount, sourceZoneId, destZoneId,
   }, null);
@@ -193,7 +230,13 @@ export async function confirmTransaction(id, requestingUser) {
     // Lock the row
     const existing = await t.transaction.findUnique({
       where: { id },
-      select: { id: true, status: true, destZoneId: true, senderAgentId: true, code: true, recipientName: true, destAmount: true, destCurrency: true },
+      select: {
+        id: true, status: true,
+        sourceZoneId: true, destZoneId: true,
+        senderAgentId: true, receiverAgentId: true,
+        code: true, recipientName: true,
+        destAmount: true, destCurrency: true,
+      },
     });
     if (!existing) throw Errors.TRANSACTION_NOT_FOUND();
     if (existing.status === 'COMPLETED') throw Errors.ALREADY_CONFIRMED();
@@ -221,20 +264,31 @@ export async function confirmTransaction(id, requestingUser) {
         userId: existing.senderAgentId,
         type: 'TRANSACTION_CONFIRMED',
         title: 'Transfert confirmé',
-        message: `${existing.code} — ${existing.destAmount / 100} ${existing.destCurrency} remis à ${existing.recipientName}`,
+        message: `${existing.code} — ${existing.destAmount} ${existing.destCurrency} remis à ${existing.recipientName}`,
         data: { transactionId: id, code: existing.code },
       },
     });
 
-    return { confirmed, notif, senderAgentId: existing.senderAgentId };
+    return {
+      confirmed, notif,
+      senderAgentId: existing.senderAgentId,
+      sourceZoneId: existing.sourceZoneId,
+      destZoneId: existing.destZoneId,
+      code: existing.code,
+    };
   });
 
-  // Emit real-time notifications (outside the DB transaction)
+  // Emit real-time updates to all relevant parties (outside the DB transaction)
   try {
+    const update = { id, status: 'COMPLETED', confirmedAt: tx.confirmed.confirmedAt, code: tx.code };
+
+    // Notify sender individually with their notification
     emitToUser(tx.senderAgentId, 'notification', tx.notif);
-    emitToUser(tx.senderAgentId, 'transaction:updated', {
-      id, status: 'COMPLETED', confirmedAt: tx.confirmed.confirmedAt,
-    });
+    emitToUser(tx.senderAgentId, 'transaction:updated', update);
+
+    // Broadcast to both zones so ALL agents in those zones refresh instantly
+    emitToZone(tx.sourceZoneId, 'transaction:updated', update);
+    emitToZone(tx.destZoneId, 'transaction:updated', update);
   } catch { /* non-blocking */ }
 
   logAudit(requestingUser.id, 'TRANSACTION_CONFIRMED', 'Transaction', id, null, null);
@@ -244,7 +298,12 @@ export async function confirmTransaction(id, requestingUser) {
 export async function cancelTransaction(id, { cancelReason }, requestingUser) {
   const existing = await prisma.transaction.findUnique({
     where: { id },
-    select: { id: true, status: true, senderAgentId: true, receiverAgentId: true, code: true },
+    select: {
+      id: true, status: true,
+      senderAgentId: true, receiverAgentId: true,
+      sourceZoneId: true, destZoneId: true,
+      code: true,
+    },
   });
   if (!existing) throw Errors.TRANSACTION_NOT_FOUND();
   if (existing.status !== 'PENDING') throw Errors.TRANSACTION_NOT_PENDING();
@@ -264,9 +323,10 @@ export async function cancelTransaction(id, { cancelReason }, requestingUser) {
     select: TRANSACTION_SELECT,
   });
 
-  // Notify both agents
-  const notifyUserIds = [...new Set([existing.senderAgentId, existing.receiverAgentId].filter(Boolean))];
+  const update = { id, status: 'CANCELLED', code: existing.code };
 
+  // Notify individual agents with a personal notification
+  const notifyUserIds = [...new Set([existing.senderAgentId, existing.receiverAgentId].filter(Boolean))];
   for (const userId of notifyUserIds) {
     const notif = await prisma.notification.create({
       data: {
@@ -279,9 +339,14 @@ export async function cancelTransaction(id, { cancelReason }, requestingUser) {
     });
     try {
       emitToUser(userId, 'notification', notif);
-      emitToUser(userId, 'transaction:updated', { id, status: 'CANCELLED' });
     } catch { /* non-blocking */ }
   }
+
+  // Broadcast status update to ALL agents in both zones so they refresh instantly
+  try {
+    emitToZone(existing.sourceZoneId, 'transaction:updated', update);
+    emitToZone(existing.destZoneId, 'transaction:updated', update);
+  } catch { /* non-blocking */ }
 
   logAudit(requestingUser.id, 'TRANSACTION_CANCELLED', 'Transaction', id, { cancelReason }, null);
   return cancelled;

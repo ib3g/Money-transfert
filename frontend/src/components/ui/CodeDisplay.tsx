@@ -22,7 +22,7 @@ export function CodeDisplay({ code }: { code: string }) {
       <p className="text-xs font-semibold text-cyan-dim uppercase tracking-widest mb-3 relative z-10">
         Code de retrait
       </p>
-      <p className="font-mono text-4xl font-bold text-white tracking-[0.25em] relative z-10">
+      <p className="font-mono lg:text-4xl text-3xl font-bold text-white tracking-[0.25em] relative z-10">
         {code}
       </p>
       <button

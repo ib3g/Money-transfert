@@ -9,7 +9,7 @@ const RATE_SELECT = {
   rate: true, source: true, isActive: true, setById: true,
   createdAt: true, updatedAt: true,
   sourceZone: { select: { id: true, name: true, currency: true } },
-  destZone:   { select: { id: true, name: true, currency: true } },
+  destZone: { select: { id: true, name: true, currency: true } },
 };
 
 export async function listRates() {
@@ -25,7 +25,7 @@ export async function listRates() {
 export async function getCorridorRate(sourceZoneId, destZoneId) {
   const [srcZone, dstZone] = await Promise.all([
     prisma.zone.findUnique({ where: { id: sourceZoneId }, select: { id: true, name: true, currency: true } }),
-    prisma.zone.findUnique({ where: { id: destZoneId },   select: { id: true, name: true, currency: true } }),
+    prisma.zone.findUnique({ where: { id: destZoneId }, select: { id: true, name: true, currency: true } }),
   ]);
   if (!srcZone) throw Errors.ZONE_NOT_FOUND();
   if (!dstZone) throw Errors.ZONE_NOT_FOUND();
@@ -37,18 +37,18 @@ export async function getCorridorRate(sourceZoneId, destZoneId) {
   });
 
   const manualRate = rates.find((r) => r.source === 'MANUAL');
-  const apiRate    = rates.find((r) => r.source === 'API');
+  const apiRate = rates.find((r) => r.source === 'API');
 
   const applied = manualRate ?? apiRate;
   if (!applied) throw Errors.NO_RATE_FOR_CORRIDOR();
 
   return {
     sourceZone: srcZone,
-    destZone:   dstZone,
-    appliedRate:    applied.rate.toString(),
-    appliedSource:  applied.source,
-    marketRate:     apiRate?.rate.toString() ?? null,
-    marketSource:   apiRate ? 'API' : null,
+    destZone: dstZone,
+    appliedRate: applied.rate.toString(),
+    appliedSource: applied.source,
+    marketRate: apiRate?.rate.toString() ?? null,
+    marketSource: apiRate ? 'API' : null,
     marketUpdatedAt: apiRate?.updatedAt ?? null,
     hasManualOverride: !!manualRate,
   };
@@ -83,15 +83,42 @@ export async function setManualRate(data, requestingUser) {
     select: RATE_SELECT,
   });
 
-  // Emit real-time update to zone rooms
+  // Find users assigned to source or dest zone to notify them
+  const affectedUsers = await prisma.userZone.findMany({
+    where: { OR: [{ zoneId: sourceZoneId }, { zoneId: destZoneId }] },
+    select: { userId: true },
+  });
+  const userIds = [...new Set(affectedUsers.map(u => u.userId))];
+
+  // Emit real-time update and create notifications
   try {
     const io = getIO();
     io.to(`zone:${sourceZoneId}`).to(`zone:${destZoneId}`).emit('rate:updated', {
       sourceZone: srcZone,
-      destZone:   dstZone,
-      rate:       rate.toString(),
-      source:     'MANUAL',
+      destZone: dstZone,
+      rate: rate.toString(),
+      source: 'MANUAL',
     });
+
+    if (userIds.length > 0) {
+      const notifications = await Promise.all(
+        userIds.map((userId) =>
+          prisma.notification.create({
+            data: {
+              userId,
+              type: 'RATE_UPDATED',
+              title: 'Nouveau Taux Manuel',
+              message: `Taux mis à jour : ${srcZone.currency}/${dstZone.currency} à ${rate}`,
+              data: { sourceZoneId, destZoneId, rate },
+            },
+          })
+        )
+      );
+
+      notifications.forEach((notif) => {
+        io.to(`user:${notif.userId}`).emit('notification', notif);
+      });
+    }
   } catch { /* socket may not be ready */ }
 
   logAudit(requestingUser.id, 'RATE_UPDATED', 'ExchangeRate', newRate.id, { sourceZoneId, destZoneId, rate }, null);
@@ -105,6 +132,48 @@ export async function deleteManualRate(sourceZoneId, destZoneId, requestingUser)
   });
 
   if (count.count === 0) throw Errors.RATE_NOT_FOUND();
+
+  const [srcZone, dstZone] = await Promise.all([
+    prisma.zone.findUnique({ where: { id: sourceZoneId } }),
+    prisma.zone.findUnique({ where: { id: destZoneId } }),
+  ]);
+
+  // Find users affected
+  const affectedUsers = await prisma.userZone.findMany({
+    where: { OR: [{ zoneId: sourceZoneId }, { zoneId: destZoneId }] },
+    select: { userId: true },
+  });
+  const userIds = [...new Set(affectedUsers.map(u => u.userId))];
+
+  // Notify
+  try {
+    const io = getIO();
+    io.to(`zone:${sourceZoneId}`).to(`zone:${destZoneId}`).emit('rate:updated', {
+      sourceZone: srcZone,
+      destZone: dstZone,
+      source: 'API', // Reverts to API
+    });
+
+    if (userIds.length > 0 && srcZone && dstZone) {
+      const notifications = await Promise.all(
+        userIds.map((userId) =>
+          prisma.notification.create({
+            data: {
+              userId,
+              type: 'RATE_UPDATED',
+              title: 'Taux Manuel Supprimé',
+              message: `Retour au taux du marché pour ${srcZone.currency}/${dstZone.currency}`,
+              data: { sourceZoneId, destZoneId },
+            },
+          })
+        )
+      );
+
+      notifications.forEach((notif) => {
+        io.to(`user:${notif.userId}`).emit('notification', notif);
+      });
+    }
+  } catch { /* ignore */ }
 
   logAudit(requestingUser.id, 'RATE_MANUAL_DELETED', 'ExchangeRate', `${sourceZoneId}-${destZoneId}`, null, null);
 }

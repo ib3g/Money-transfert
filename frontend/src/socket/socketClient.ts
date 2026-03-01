@@ -49,14 +49,28 @@ export function connectSocket(): void {
     useNotificationStore.getState().addNotification(notification);
   });
 
-  socket.on('transaction:updated', (update: { id: string; status: string }) => {
+  socket.on('transaction:updated', (update: { id: string; status: string; code?: string }) => {
+    // Invalidate by ID (detail view)
     queryClientRef?.invalidateQueries({ queryKey: ['transactions', update.id] });
+    // Invalidate by code (ConfirmTransaction page uses this)
+    if (update.code) {
+      queryClientRef?.invalidateQueries({ queryKey: ['transactions', 'code', update.code] });
+    }
+    // Invalidate the full list
+    queryClientRef?.invalidateQueries({ queryKey: ['transactions'] });
+    queryClientRef?.invalidateQueries({ queryKey: ['stats'] });
+  });
+
+  socket.on('transaction:created', () => {
     queryClientRef?.invalidateQueries({ queryKey: ['transactions'] });
     queryClientRef?.invalidateQueries({ queryKey: ['stats'] });
   });
 
   socket.on('rate:updated', () => {
     queryClientRef?.invalidateQueries({ queryKey: ['rates'] });
+    // Also invalidate corridor rates used during new transaction creation
+    queryClientRef?.invalidateQueries({ queryKey: ['rates', 'corridor'] });
+    queryClientRef?.invalidateQueries({ queryKey: ['rates', 'history'] });
   });
 
   socket.on('session:expired', () => {
